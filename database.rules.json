@@ -1,0 +1,30 @@
+{
+  "rules": {
+    "heroLocations": {
+      "$heroId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $heroId"
+      }
+    },
+    "presence": {
+      "$heroId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $heroId"
+      }
+    },
+    "jobTracking": {
+      "$jobId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
+    "typing": {
+      "$jobId": {
+        "$userId": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId"
+        }
+      }
+    }
+  }
+}
