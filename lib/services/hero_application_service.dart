@@ -23,12 +23,17 @@ class HeroApplicationService {
       String userId, String email) async {
     final query = await _applications
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .limit(1)
+        .limit(5)
         .get();
 
     if (query.docs.isNotEmpty) {
-      return HeroApplicationModel.fromFirestore(query.docs.first);
+      final sorted = query.docs.toList()
+        ..sort((a, b) {
+          final aTime = (a.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+          final bTime = (b.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+          return bTime.compareTo(aTime);
+        });
+      return HeroApplicationModel.fromFirestore(sorted.first);
     }
 
     final docRef = await _applications.add({
@@ -65,12 +70,17 @@ class HeroApplicationService {
   Stream<HeroApplicationModel?> watchUserApplication(String userId) {
     return _applications
         .where('userId', isEqualTo: userId)
-        .orderBy('createdAt', descending: true)
-        .limit(1)
+        .limit(5)
         .snapshots()
         .map((snapshot) {
       if (snapshot.docs.isEmpty) return null;
-      return HeroApplicationModel.fromFirestore(snapshot.docs.first);
+      final sorted = snapshot.docs.toList()
+        ..sort((a, b) {
+          final aTime = (a.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+          final bTime = (b.data()['createdAt'] as Timestamp?)?.millisecondsSinceEpoch ?? 0;
+          return bTime.compareTo(aTime);
+        });
+      return HeroApplicationModel.fromFirestore(sorted.first);
     });
   }
 

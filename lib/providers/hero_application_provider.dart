@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/hero_application_model.dart';
 import '../services/hero_application_service.dart';
@@ -64,7 +65,9 @@ class HeroApplicationNotifier extends StateNotifier<HeroApplicationState> {
         currentStep: application.currentStep,
         isLoading: false,
       );
-    } catch (e) {
+    } catch (e, stack) {
+      debugPrint('[HeroApplication] Failed to load: $e');
+      debugPrint('[HeroApplication] Stack: $stack');
       state = state.copyWith(
         isLoading: false,
         error: 'Failed to load application: $e',
@@ -73,7 +76,11 @@ class HeroApplicationNotifier extends StateNotifier<HeroApplicationState> {
   }
 
   Future<void> refresh() async {
-    if (state.application == null) return;
+    if (state.application == null) {
+      state = state.copyWith(isLoading: true, error: null);
+      await _initialize();
+      return;
+    }
     try {
       final application =
           await _service.getApplication(state.application!.id);
