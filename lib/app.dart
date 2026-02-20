@@ -2,12 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/onboarding_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/view_mode_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/signup_screen.dart';
 import 'screens/customer/customer_home_screen.dart';
 import 'screens/hero/hero_home_screen.dart';
+import 'screens/onboarding/onboarding_screen.dart';
 
 class OTWApp extends ConsumerWidget {
   const OTWApp({super.key});
@@ -19,19 +21,24 @@ class OTWApp extends ConsumerWidget {
     final authState = ref.watch(authProvider);
     final showHeroDashboard = ref.watch(heroViewModeProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final onboardingAsync = ref.watch(onboardingCompleteProvider);
 
     print('[APP] build: isInitialized=${authState.isInitialized}, isAuthenticated=${authState.isAuthenticated}, isHero=${authState.isHero}, showHero=$showHeroDashboard');
 
-    // Single MaterialApp; only the home widget changes so we never swap the root (avoids white screen on iOS).
     Widget home;
     if (!authState.isInitialized) {
       home = const _SplashScreen();
-    } else if (!authState.isAuthenticated) {
-      home = const LoginScreen();
-    } else if (authState.isHero && showHeroDashboard) {
-      home = const HeroHomeScreen();
     } else {
-      home = const CustomerHomeScreen();
+      final onboardingDone = onboardingAsync.valueOrNull ?? false;
+      if (!onboardingDone) {
+        home = const OnboardingScreen();
+      } else if (!authState.isAuthenticated) {
+        home = const LoginScreen();
+      } else if (authState.isHero && showHeroDashboard) {
+        home = const HeroHomeScreen();
+      } else {
+        home = const CustomerHomeScreen();
+      }
     }
 
     return MaterialApp(
