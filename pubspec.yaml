@@ -79,4 +79,5 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/icons/dark/
     - assets/data/

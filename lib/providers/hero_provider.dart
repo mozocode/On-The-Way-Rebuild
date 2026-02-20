@@ -28,6 +28,7 @@ class HeroState {
   HeroState copyWith({
     HeroModel? hero,
     JobModel? activeJob,
+    bool clearActiveJob = false,
     LocationModel? currentLocation,
     bool? isOnline,
     bool? isLoading,
@@ -35,7 +36,7 @@ class HeroState {
   }) {
     return HeroState(
       hero: hero ?? this.hero,
-      activeJob: activeJob ?? this.activeJob,
+      activeJob: clearActiveJob ? null : (activeJob ?? this.activeJob),
       currentLocation: currentLocation ?? this.currentLocation,
       isOnline: isOnline ?? this.isOnline,
       isLoading: isLoading ?? this.isLoading,
@@ -70,24 +71,44 @@ class HeroNotifier extends StateNotifier<HeroState> {
   }
 
   void _initialize() {
-    _heroSub = _firestore.watchHero(heroId).listen((hero) {
-      if (hero != null) {
-        state = state.copyWith(
-          hero: hero,
-          isOnline: hero.status.isOnline,
-          isLoading: false,
-        );
-      }
-    });
+    _heroSub = _firestore.watchHero(heroId).listen(
+      (hero) {
+        if (hero != null) {
+          state = state.copyWith(
+            hero: hero,
+            isOnline: hero.status.isOnline,
+            isLoading: false,
+          );
+        } else {
+          state = state.copyWith(isLoading: false);
+        }
+      },
+      onError: (e) {
+        print('Hero watch error: $e');
+        state = state.copyWith(isLoading: false, error: 'Failed to load hero profile');
+      },
+    );
 
-    _jobSub = _firestore.watchActiveHeroJob(heroId).listen((job) {
-      state = state.copyWith(activeJob: job);
-      _locationService.setCurrentJob(job?.id);
-    });
+    _jobSub = _firestore.watchActiveHeroJob(heroId).listen(
+      (job) {
+        state = job != null
+            ? state.copyWith(activeJob: job)
+            : state.copyWith(clearActiveJob: true);
+        _locationService.setCurrentJob(job?.id);
+      },
+      onError: (e) {
+        print('Active job watch error: $e');
+      },
+    );
 
-    _locationSub = _locationService.locationStream.listen((location) {
-      state = state.copyWith(currentLocation: location);
-    });
+    _locationSub = _locationService.locationStream.listen(
+      (location) {
+        state = state.copyWith(currentLocation: location);
+      },
+      onError: (e) {
+        print('Location stream error: $e');
+      },
+    );
   }
 
   Future<void> goOnline() async {

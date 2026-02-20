@@ -165,7 +165,7 @@ class FirestoreService {
     await _jobs.doc(jobId).update({
       'status': status,
       'statusHistory': FieldValue.arrayUnion([
-        {'status': status, 'at': FieldValue.serverTimestamp()}
+        {'status': status, 'at': Timestamp.now()}
       ]),
       'timestamps.${_getTimestampField(status)}': FieldValue.serverTimestamp(),
     });
@@ -196,11 +196,23 @@ class FirestoreService {
           throw Exception('Job is no longer available');
         }
 
-        if (hero['status']?['currentJobId'] != null) {
-          throw Exception('Hero already has an active job');
+        final existingJobId = hero['status']?['currentJobId'];
+        if (existingJobId != null) {
+          final oldJobDoc =
+              await transaction.get(_jobs.doc(existingJobId as String));
+          if (oldJobDoc.exists) {
+            final oldStatus = oldJobDoc.data()?['status'];
+            if (oldStatus != null &&
+                oldStatus != 'completed' &&
+                oldStatus != 'cancelled') {
+              throw Exception('Hero already has an active job');
+            }
+          }
+          // Stale reference – will be overwritten below
         }
 
         final now = FieldValue.serverTimestamp();
+        final nowTimestamp = Timestamp.now();
 
         transaction.update(_jobs.doc(jobId), {
           'status': 'assigned',
@@ -218,7 +230,7 @@ class FirestoreService {
           'dispatch.acceptedAt': now,
           'timestamps.assignedAt': now,
           'statusHistory': FieldValue.arrayUnion([
-            {'status': 'assigned', 'at': now, 'heroId': heroId}
+            {'status': 'assigned', 'at': nowTimestamp, 'heroId': heroId}
           ]),
         });
 
@@ -228,7 +240,8 @@ class FirestoreService {
         });
       });
       return true;
-    } catch (e) {
+    } catch (e, st) {
+      print('acceptJob error: $e\n$st');
       return false;
     }
   }
@@ -262,5 +275,54 @@ class FirestoreService {
       if (!doc.exists) return null;
       return doc.data();
     });
+  }
+
+  Future<void> submitReview({
+    required String jobId,
+    required String reviewerId,
+    required String revieweeId,
+    required String reviewerRole,
+    required int rating,
+    List<String> tags = const [],
+    String? comment,
+    int? tipAmountCents,
+  }) async {
+    final reviewData = {
+      'jobId': jobId,
+      'reviewerId': reviewerId,
+      'revieweeId': revieweeId,
+      'reviewerRole': reviewerRole,
+      'rating': rating,
+      'tags': tags,
+      'comment': comment,
+      'tipAmountCents': tipAmountCents,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+
+    await _jobs.doc(jobId).collection('reviews').doc(reviewerRole).set(reviewData);
+
+    if (tipAmountCents != null && tipAmountCents > 0) {
+      await _jobs.doc(jobId).update({
+        'pricing.tipAmountCents': tipAmountCents,
+      });
+    }
+  }
+
+  Stream<JobModel?> watchLatestCompletedCustomerJob(String customerId) {
+    return _jobs
+        .where('customer.id', isEqualTo: customerId)
+        .where('status', isEqualTo: 'completed')
+        .orderBy('timestamps.completedAt', descending: true)
+        .limit(1)
+        .snapshots()
+        .map((snapshot) {
+          if (snapshot.docs.isEmpty) return null;
+          return JobModel.fromFirestore(snapshot.docs.first);
+        });
+  }
+
+  Future<bool> hasReview(String jobId, String role) async {
+    final doc = await _jobs.doc(jobId).collection('reviews').doc(role).get();
+    return doc.exists;
   }
 }

@@ -68,41 +68,62 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
   }
 
   void _initialize() {
-    _realtimeLocationSub =
-        _realtimeDb.watchJobTracking(jobId).listen(_handleRealtimeUpdate);
-    _firestoreJobSub = _firestore.watchJob(jobId).listen(_handleFirestoreUpdate);
+    _realtimeLocationSub = _realtimeDb.watchJobTracking(jobId).listen(
+      _handleRealtimeUpdate,
+      onError: (e) {
+        print('[TrackingProvider] Realtime stream error: $e');
+        state = state.copyWith(error: 'Location stream error');
+      },
+    );
+    _firestoreJobSub = _firestore.watchJob(jobId).listen(
+      _handleFirestoreUpdate,
+      onError: (e) {
+        print('[TrackingProvider] Firestore stream error: $e');
+      },
+    );
   }
 
   void _handleRealtimeUpdate(Map<String, dynamic>? data) {
     if (data == null) return;
     final heroLocationData = data['heroLocation'];
-    if (heroLocationData == null) return;
+    if (heroLocationData == null || heroLocationData is! Map) return;
 
-    final newLocation = LocationModel(
-      latitude: (heroLocationData['latitude'] as num).toDouble(),
-      longitude: (heroLocationData['longitude'] as num).toDouble(),
-      heading: (heroLocationData['heading'] as num?)?.toDouble(),
-      speed: (heroLocationData['speed'] as num?)?.toDouble(),
-      updatedAt: heroLocationData['updatedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(
-              heroLocationData['updatedAt'] as int)
-          : DateTime.now(),
-    );
+    try {
+      final newLocation = LocationModel(
+        latitude: (heroLocationData['latitude'] as num).toDouble(),
+        longitude: (heroLocationData['longitude'] as num).toDouble(),
+        heading: (heroLocationData['heading'] as num?)?.toDouble(),
+        speed: (heroLocationData['speed'] as num?)?.toDouble(),
+        updatedAt: heroLocationData['updatedAt'] is num
+            ? DateTime.fromMillisecondsSinceEpoch(
+                (heroLocationData['updatedAt'] as num).toInt())
+            : DateTime.now(),
+      );
 
-    final etaData = data['eta'];
-    _animateToLocation(newLocation);
+      _animateToLocation(newLocation);
 
-    state = state.copyWith(
-      heroLocation: newLocation,
-      etaMinutes: etaData?['minutes'] as int?,
-      etaDistance: (etaData?['distance'] as num?)?.toDouble(),
-      isLoading: false,
-    );
+      final etaData = data['eta'];
+      final etaMinutes = (etaData is Map) ? (etaData['minutes'] as num?)?.toInt() : null;
+      final etaDistance = (etaData is Map) ? (etaData['distance'] as num?)?.toDouble() : null;
+
+      state = state.copyWith(
+        heroLocation: newLocation,
+        isLoading: false,
+        etaMinutes: etaMinutes ?? state.etaMinutes,
+        etaDistance: etaDistance ?? state.etaDistance,
+      );
+    } catch (e) {
+      print('[TrackingProvider] Error parsing realtime update: $e');
+    }
   }
 
   void _handleFirestoreUpdate(JobModel? job) {
     if (job == null) return;
-    state = state.copyWith(routePolyline: job.tracking.routePolyline);
+    state = state.copyWith(
+      routePolyline: job.tracking.routePolyline,
+      etaMinutes: job.tracking.etaMinutes ?? state.etaMinutes,
+      etaDistance: job.tracking.etaDistance ?? state.etaDistance,
+    );
   }
 
   void _animateToLocation(LocationModel newLocation) {

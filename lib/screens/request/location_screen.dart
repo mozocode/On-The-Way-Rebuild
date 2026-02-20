@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import '../../config/theme.dart';
 import '../../widgets/common/step_progress_indicator.dart';
 import 'confirm_request_screen.dart';
@@ -21,6 +23,9 @@ class LocationScreen extends StatefulWidget {
 
 class _LocationScreenState extends State<LocationScreen> {
   String _address = '';
+  double? _latitude;
+  double? _longitude;
+  bool _isLocating = false;
   final _notesController = TextEditingController();
 
   @override
@@ -29,11 +34,68 @@ class _LocationScreenState extends State<LocationScreen> {
     super.dispose();
   }
 
-  void _useCurrentLocation() {
-    // TODO: Get actual GPS location and reverse geocode
-    setState(() {
-      _address = '7319 Baker St, Pittsburgh, PA 15206 US';
-    });
+  Future<void> _useCurrentLocation() async {
+    setState(() => _isLocating = true);
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Location permission denied')),
+            );
+          }
+          return;
+        }
+      }
+      if (permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permissions permanently denied. Enable in Settings.')),
+          );
+        }
+        return;
+      }
+
+      final position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      String formattedAddress = '${position.latitude.toStringAsFixed(4)}, ${position.longitude.toStringAsFixed(4)}';
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          position.latitude,
+          position.longitude,
+        );
+        if (placemarks.isNotEmpty) {
+          final p = placemarks.first;
+          final parts = <String>[
+            if (p.street != null && p.street!.isNotEmpty) p.street!,
+            if (p.locality != null && p.locality!.isNotEmpty) p.locality!,
+            if (p.administrativeArea != null && p.administrativeArea!.isNotEmpty) p.administrativeArea!,
+            if (p.postalCode != null && p.postalCode!.isNotEmpty) p.postalCode!,
+          ];
+          if (parts.isNotEmpty) formattedAddress = parts.join(', ');
+        }
+      } catch (_) {}
+
+      if (mounted) {
+        setState(() {
+          _latitude = position.latitude;
+          _longitude = position.longitude;
+          _address = formattedAddress;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not get location: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isLocating = false);
+    }
   }
 
   @override
@@ -123,13 +185,23 @@ class _LocationScreenState extends State<LocationScreen> {
 
                     // Use current location
                     GestureDetector(
-                      onTap: _useCurrentLocation,
+                      onTap: _isLocating ? null : _useCurrentLocation,
                       child: Row(
                         children: [
-                          Icon(Icons.near_me, size: 16, color: AppTheme.brandGreen),
+                          if (_isLocating)
+                            SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppTheme.brandGreen,
+                              ),
+                            )
+                          else
+                            Icon(Icons.near_me, size: 16, color: AppTheme.brandGreen),
                           const SizedBox(width: 6),
                           Text(
-                            'Use current location',
+                            _isLocating ? 'Getting location...' : 'Use current location',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -181,7 +253,7 @@ class _LocationScreenState extends State<LocationScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _address.isNotEmpty
+                  onPressed: _address.isNotEmpty && _latitude != null
                       ? () {
                           Navigator.push(
                             context,
@@ -191,6 +263,8 @@ class _LocationScreenState extends State<LocationScreen> {
                                 serviceLabel: widget.serviceLabel,
                                 vehicleInfo: widget.vehicleInfo,
                                 address: _address,
+                                latitude: _latitude!,
+                                longitude: _longitude!,
                                 notes: _notesController.text,
                               ),
                             ),

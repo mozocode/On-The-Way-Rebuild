@@ -2,7 +2,7 @@ import 'package:flutter_radar/flutter_radar.dart';
 
 class RadarConfig {
   /// Replace with your Radar publishable key from https://dashboard.radar.com
-  static const String publishableKey = 'prj_live_pk_xxxxxxxxxxxxx';
+  static const String publishableKey = 'prj_test_pk_e259e709dc51b6d1e8fa864c1940c93fc1712989';
 
   static Future<void> initialize() async {
     await Radar.initialize(publishableKey);
@@ -11,6 +11,10 @@ class RadarConfig {
     Radar.onLocation(_handleLocationUpdate);
     Radar.onClientLocation(_handleClientLocation);
     Radar.onError(_handleError);
+    // Request location so the system prompt appears early and Radar stops returning ERROR_PERMISSIONS
+    try {
+      await Radar.requestPermissions(false);
+    } catch (_) {}
   }
 
   static void _handleRadarEvents(Map result) {

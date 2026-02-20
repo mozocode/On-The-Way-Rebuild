@@ -401,42 +401,54 @@ class _VehicleInfoScreenState extends State<VehicleInfoScreen> {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
+      enableDrag: false,
       backgroundColor: Colors.transparent,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        minChildSize: 0.3,
-        maxChildSize: 0.95,
-        builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  controller: scrollController,
-                  itemCount: items.length,
-                  itemBuilder: (context, i) {
-                    final item = items[i];
-                    final isSelected = item == selected;
-                    return ListTile(
-                      title: Text(item),
-                      trailing: isSelected ? Icon(Icons.check, color: AppTheme.brandGreen) : null,
-                      onTap: () => onSelect(item),
-                    );
-                  },
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.8,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+            ),
+            child: Column(
+              children: [
+                // Header with close button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 8, 0),
+                  child: Row(
+                    children: [
+                      const Spacer(),
+                      Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, size: 22),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                const Divider(height: 1),
+                Expanded(
+                  child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    itemCount: items.length,
+                    itemBuilder: (context, i) {
+                      final item = items[i];
+                      final isSelected = item == selected;
+                      return ListTile(
+                        title: Text(item),
+                        trailing: isSelected ? Icon(Icons.check, color: AppTheme.brandGreen) : null,
+                        onTap: () => onSelect(item),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

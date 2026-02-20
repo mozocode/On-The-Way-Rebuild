@@ -1,12 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
+import '../../models/location_model.dart';
+import '../../providers/job_provider.dart';
+import '../../services/payment_service.dart';
 import '../../widgets/common/step_progress_indicator.dart';
+import '../customer/tracking_screen.dart';
 
-class ConfirmRequestScreen extends StatefulWidget {
+class ConfirmRequestScreen extends ConsumerStatefulWidget {
   final String serviceType;
   final String serviceLabel;
   final String vehicleInfo;
   final String address;
+  final double latitude;
+  final double longitude;
   final String notes;
 
   const ConfirmRequestScreen({
@@ -15,42 +22,67 @@ class ConfirmRequestScreen extends StatefulWidget {
     required this.serviceLabel,
     required this.vehicleInfo,
     required this.address,
+    required this.latitude,
+    required this.longitude,
     required this.notes,
   });
 
   @override
-  State<ConfirmRequestScreen> createState() => _ConfirmRequestScreenState();
+  ConsumerState<ConfirmRequestScreen> createState() => _ConfirmRequestScreenState();
 }
 
-class _ConfirmRequestScreenState extends State<ConfirmRequestScreen> {
+class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
   bool _priorityMatch = false;
+  bool _isSubmitting = false;
+  final _paymentService = PaymentService();
 
-  // Mock pricing
-  double get _basePrice {
-    switch (widget.serviceType) {
-      case 'flat_tire':
-        return 87.00;
-      case 'dead_battery':
-        return 65.00;
-      case 'lockout':
-        return 75.00;
-      case 'fuel_delivery':
-        return 70.00;
-      case 'towing':
-        return 125.00;
-      case 'winch_out':
-        return 95.00;
-      default:
-        return 75.00;
-    }
+  double get _total {
+    final pricing = _paymentService.calculatePrice(
+      serviceType: widget.serviceType,
+      distanceMiles: 5.0,
+      isPriority: _priorityMatch,
+    );
+    return pricing.total / 100.0;
   }
 
-  double get _total => _basePrice + (_priorityMatch ? 15.00 : 0);
-
-  // Check if late night (after 10pm or before 6am)
   bool get _isLateNight {
     final hour = DateTime.now().hour;
     return hour >= 22 || hour < 6;
+  }
+
+  Future<void> _submitRequest() async {
+    setState(() => _isSubmitting = true);
+
+    final notifier = ref.read(jobCreationProvider.notifier);
+    notifier.setServiceType(widget.serviceType);
+    notifier.setPickupLocation(
+      LocationModel(latitude: widget.latitude, longitude: widget.longitude),
+      widget.address,
+      notes: widget.notes.isNotEmpty ? widget.notes : null,
+    );
+
+    final jobId = await notifier.createJob();
+
+    if (!mounted) return;
+    setState(() => _isSubmitting = false);
+
+    if (jobId != null) {
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(
+          builder: (_) => CustomerTrackingScreen(jobId: jobId),
+        ),
+        (route) => route.isFirst,
+      );
+    } else {
+      final error = ref.read(jobCreationProvider).error;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error ?? 'Failed to submit request'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   @override
@@ -119,7 +151,7 @@ class _ConfirmRequestScreenState extends State<ConfirmRequestScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '\$${_basePrice.toStringAsFixed(2)}',
+                            '\$${_total.toStringAsFixed(2)}',
                             style: TextStyle(
                               fontSize: 32,
                               fontWeight: FontWeight.w800,
@@ -345,25 +377,24 @@ class _ConfirmRequestScreenState extends State<ConfirmRequestScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Submit job request to Firebase
-                    // For now, pop back to home
-                    Navigator.popUntil(context, (route) => route.isFirst);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: const Text('Request submitted! Finding a Hero...'),
-                        backgroundColor: AppTheme.brandGreen,
-                      ),
-                    );
-                  },
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text('Confirm & Request Hero', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                      SizedBox(width: 8),
-                      Icon(Icons.arrow_forward, size: 20),
-                    ],
-                  ),
+                  onPressed: _isSubmitting ? null : _submitRequest,
+                  child: _isSubmitting
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text('Confirm & Request Hero', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            SizedBox(width: 8),
+                            Icon(Icons.arrow_forward, size: 20),
+                          ],
+                        ),
                 ),
               ),
             ),

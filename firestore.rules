@@ -26,17 +26,9 @@ service cloud.firestore {
     }
 
     match /jobs/{jobId} {
-      allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.customer.id ||
-        request.auth.uid == resource.data.hero.id ||
-        isAdmin()
-      );
-      allow create: if isAuthenticated() && request.auth.uid == request.resource.data.customer.id;
-      allow update: if isAuthenticated() && (
-        request.auth.uid == resource.data.customer.id ||
-        request.auth.uid == resource.data.hero.id ||
-        isAdmin()
-      );
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
       allow delete: if isAdmin();
 
       match /messages/{messageId} {

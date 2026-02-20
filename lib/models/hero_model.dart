@@ -130,8 +130,22 @@ class HeroModel {
 
   factory HeroModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>? ?? {};
-    final services = data['services'] as Map<String, dynamic>?;
-    final location = data['location'] as Map<String, dynamic>?;
+    // services can be a Map or a List in Firestore; handle both
+    final rawServices = data['services'];
+    Map<String, dynamic>? services;
+    List<String> servicesOffered = [];
+    List<String> equipment = [];
+    if (rawServices is Map<String, dynamic>) {
+      services = rawServices;
+      servicesOffered = List<String>.from(services['offered'] ?? []);
+      equipment = List<String>.from(services['equipment'] ?? []);
+    } else if (rawServices is List) {
+      servicesOffered = List<String>.from(rawServices);
+    }
+
+    final location = data['location'] is Map<String, dynamic>
+        ? data['location'] as Map<String, dynamic>
+        : null;
     return HeroModel(
       id: doc.id,
       userId: data['userId'] ?? '',
@@ -145,8 +159,8 @@ class HeroModel {
       vehicle: data['vehicle'] != null
           ? Vehicle.fromJson(data['vehicle'])
           : null,
-      servicesOffered: List<String>.from(services?['offered'] ?? []),
-      equipment: List<String>.from(services?['equipment'] ?? []),
+      servicesOffered: servicesOffered,
+      equipment: equipment,
       lastKnownLocation: location != null && location['lastKnownLocation'] != null
           ? LocationModel.fromFirestore(
               location['lastKnownLocation'] as Map<String, dynamic>)

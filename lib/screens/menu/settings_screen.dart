@@ -1,27 +1,61 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
+import '../../providers/theme_provider.dart';
+import 'edit_profile_screen.dart';
+import 'payment_methods_screen.dart';
 
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
-  String _themeMode = 'light'; // system, light, dark
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _pushNotifications = true;
+
+  String get _themeMode {
+    final mode = ref.watch(themeModeProvider);
+    switch (mode) {
+      case ThemeMode.system:
+        return 'system';
+      case ThemeMode.light:
+        return 'light';
+      case ThemeMode.dark:
+        return 'dark';
+    }
+  }
+
+  void _setThemeMode(String value) {
+    switch (value) {
+      case 'system':
+        ref.read(themeModeProvider.notifier).state = ThemeMode.system;
+        break;
+      case 'light':
+        ref.read(themeModeProvider.notifier).state = ThemeMode.light;
+        break;
+      case 'dark':
+        ref.read(themeModeProvider.notifier).state = ThemeMode.dark;
+        break;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgColor = isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5);
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final textColor = isDark ? Colors.white : const Color(0xFF1A1A1A);
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: bgColor,
       body: SafeArea(
         child: Column(
           children: [
             // Header
             Container(
-              color: Colors.white,
+              color: cardColor,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
@@ -54,14 +88,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       icon: Icons.person_outline,
                       iconColor: Colors.blue,
                       label: 'Personal Information',
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const EditProfileScreen()));
+                      },
                     ),
                     const SizedBox(height: 8),
                     _settingsItem(
                       icon: Icons.payment,
                       iconColor: AppTheme.brandGreen,
                       label: 'Payment Method',
-                      onTap: () {},
+                      onTap: () {
+                        Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentMethodsScreen()));
+                      },
                     ),
 
                     const SizedBox(height: 24),
@@ -87,7 +125,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: cardColor,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Row(
@@ -173,12 +211,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String label,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardColor,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Row(
@@ -210,7 +251,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final selected = _themeMode == value;
     return Expanded(
       child: GestureDetector(
-        onTap: () => setState(() => _themeMode = value),
+        onTap: () => _setThemeMode(value),
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(

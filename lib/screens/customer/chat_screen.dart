@@ -20,14 +20,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
   final _firestoreService = FirestoreService();
   final _realtimeDbService = RealtimeDbService();
   bool _isTyping = false;
+  String? _cachedUserId;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _cachedUserId ??= ref.read(currentUserProvider)?.id;
+  }
 
   @override
   void dispose() {
     _messageController.dispose();
     _scrollController.dispose();
-    final user = ref.read(currentUserProvider);
-    if (user != null && _isTyping) {
-      _realtimeDbService.setTyping(widget.jobId, user.id, false);
+    if (_cachedUserId != null && _isTyping) {
+      _realtimeDbService.setTyping(widget.jobId, _cachedUserId!, false);
     }
     super.dispose();
   }

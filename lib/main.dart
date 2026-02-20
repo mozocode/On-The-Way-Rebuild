@@ -10,6 +10,32 @@ import 'app.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Catch any Flutter framework errors so they print instead of silently showing white
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    print('=== FLUTTER ERROR ===');
+    print(details.exceptionAsString());
+    print(details.stack);
+  };
+
+  // Custom error widget so build errors show a red screen with text instead of white
+  ErrorWidget.builder = (FlutterErrorDetails details) {
+    return MaterialApp(
+      home: Scaffold(
+        backgroundColor: Colors.red,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Text(
+              'BUILD ERROR:\n${details.exceptionAsString()}',
+              style: const TextStyle(color: Colors.white, fontSize: 14),
+            ),
+          ),
+        ),
+      ),
+    );
+  };
+
   if (!kIsWeb) {
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
@@ -24,31 +50,40 @@ void main() async {
     );
   }
 
+  print('[MAIN] starting Firebase init...');
   await FirebaseConfig.initialize();
+  print('[MAIN] Firebase init done');
 
-  // Radar SDK only supports iOS and Android
-  if (!kIsWeb &&
-      (defaultTargetPlatform == TargetPlatform.iOS ||
-       defaultTargetPlatform == TargetPlatform.android)) {
-    try {
-      await RadarConfig.initialize();
-    } catch (e) {
-      print('Radar init failed: $e');
-    }
-  }
-
-  // Notifications - skip on web
-  if (!kIsWeb) {
-    try {
-      await NotificationService().initialize();
-    } catch (e) {
-      print('Notification service init failed: $e');
-    }
-  }
-
+  print('[MAIN] calling runApp...');
   runApp(
     const ProviderScope(
       child: OTWApp(),
     ),
   );
+  print('[MAIN] runApp called');
+
+  // Notifications - init after first frame so a hang can't block the UI
+  if (!kIsWeb) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationService().initialize().then((_) {
+        print('[MAIN] notification init done');
+      }).catchError((e) {
+        print('Notification service init failed: $e');
+      });
+    });
+  }
+
+  // Radar init after first frame so UI paints immediately
+  if (!kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.iOS ||
+       defaultTargetPlatform == TargetPlatform.android)) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('[MAIN] post-frame: starting Radar init...');
+      RadarConfig.initialize().then((_) {
+        print('[MAIN] Radar init done');
+      }).catchError((e) {
+        print('Radar init failed: $e');
+      });
+    });
+  }
 }

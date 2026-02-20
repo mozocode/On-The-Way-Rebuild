@@ -1,14 +1,13 @@
-import * as admin from 'firebase-admin';
-import * as functions from 'firebase-functions';
+import * as admin from "firebase-admin";
 
 admin.initializeApp();
 
-// Export dispatch, radar webhooks, and notifications when implemented.
-// Example:
-// export { dispatchJob, acceptJob } from './dispatch/dispatchJob';
-// export { radarLocationUpdate, radarGeofenceUpdate } from './radar/webhooks';
-// export { sendPushNotification } from './notifications/push';
-
-export const helloWorld = functions.https.onRequest((req, res) => {
-  res.send('OTW Cloud Functions');
-});
+export { dispatchJob } from "./dispatch/dispatchJob";
+export { acceptJob } from "./dispatch/acceptJob";
+export { radarLocationUpdate, radarGeofenceUpdate } from "./radar/webhooks";
+export { sendPushNotification, sendJobNotification } from "./notifications/push";
+export { createPaymentIntent, capturePayment } from "./payments/stripe";
+export { getOrCreateCustomer, addPaymentMethod } from "./payments/customer";
+export { cleanupExpiredLocations, cleanupOldJobs } from "./jobs/cleanup";
+export { onJobStatusChanged } from "./jobs/triggers";
+export { getRoute } from "./routing/getRoute";

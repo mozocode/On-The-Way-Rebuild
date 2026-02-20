@@ -69,14 +69,17 @@ class LocationService {
     _currentHeroId = heroId;
     _currentJobId = jobId;
 
-    await _radarService.setUserId(heroId);
-    await _radarService.setMetadata(
-      isOnline: true,
-      isVerified: true,
-      currentJobId: jobId,
-    );
-
-    await _radarService.startTracking(preset);
+    try {
+      await _radarService.setUserId(heroId);
+      await _radarService.setMetadata(
+        isOnline: true,
+        isVerified: true,
+        currentJobId: jobId,
+      );
+      await _radarService.startTracking(preset);
+    } catch (e) {
+      print('[LocationService] Radar tracking setup error: $e');
+    }
 
     _positionSubscription?.cancel();
     const locationSettings = LocationSettings(

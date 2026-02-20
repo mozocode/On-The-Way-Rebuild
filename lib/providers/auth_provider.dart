@@ -62,6 +62,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   void _initialize() {
+    // If Firebase auth stream doesn't emit within 2s (e.g. simulator/network), show login so app isn't stuck on white splash
+    Future.delayed(const Duration(seconds: 2), () {
+      if (!state.isInitialized) {
+        print('[AUTH] init timeout: showing login');
+        state = const AuthState(isInitialized: true);
+      }
+    });
+
     _authSub = _authService.authStateChanges.listen(
       (user) {
         print('[AUTH] authStateChanges fired: user=${user?.uid ?? "null"}');

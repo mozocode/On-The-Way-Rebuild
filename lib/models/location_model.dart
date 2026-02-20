@@ -60,7 +60,7 @@ class LocationModel {
       altitude: (data['altitude'] as num?)?.toDouble(),
       address: data['address'] as String?,
       updatedAt: data['updatedAt'] != null
-          ? DateTime.fromMillisecondsSinceEpoch(data['updatedAt'] as int)
+          ? DateTime.fromMillisecondsSinceEpoch((data['updatedAt'] as num).toInt())
           : null,
     );
   }

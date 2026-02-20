@@ -43,3 +43,13 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Cloud Functions build artifacts & dependencies
+functions/node_modules/
+functions/lib/
+
+# Firebase local config
+.firebaserc
+
+# Temp scripts
+cleanup.js

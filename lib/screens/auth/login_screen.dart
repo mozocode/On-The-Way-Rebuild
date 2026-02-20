@@ -62,10 +62,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     });
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: Scaffold(
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 32),

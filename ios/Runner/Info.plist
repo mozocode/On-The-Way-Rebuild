@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>On The Way uses background location when you are in Hero mode so we can match you with nearby customers and track assistance trips.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>On The Way uses your location to show your position on the map and to receive nearby assistance requests when you are in Hero mode.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

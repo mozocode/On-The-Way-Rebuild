@@ -25,13 +25,16 @@ class RadarService {
     List<String>? servicesOffered,
     String? currentJobId,
   }) async {
-    await Radar.setMetadata({
+    final meta = <String, dynamic>{
       'userType': 'hero',
       'isOnline': isOnline,
       'isVerified': isVerified,
       'servicesOffered': servicesOffered ?? [],
-      'currentJobId': currentJobId,
-    });
+    };
+    if (currentJobId != null) {
+      meta['currentJobId'] = currentJobId;
+    }
+    await Radar.setMetadata(meta);
   }
 
   Future<String> requestPermissions({bool background = true}) async {

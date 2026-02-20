@@ -38,8 +38,9 @@ class RealtimeDbService {
   Future<LocationModel?> getHeroLocation(String heroId) async {
     final snapshot = await heroLocationRef(heroId).get();
     if (!snapshot.exists) return null;
-    final data = snapshot.value as Map<dynamic, dynamic>;
-    return LocationModel.fromRealtimeDb(data);
+    final raw = snapshot.value;
+    if (raw is! Map) return null;
+    return LocationModel.fromRealtimeDb(raw);
   }
 
   Future<void> removeHeroLocation(String heroId) async {
@@ -127,7 +128,19 @@ class RealtimeDbService {
 
   Stream<Map<String, dynamic>?> watchJobTracking(String jobId) {
     return jobTrackingRef(jobId).onValue.map((event) {
-      return event.snapshot.value as Map<String, dynamic>?;
+      final raw = event.snapshot.value;
+      if (raw == null) return null;
+      if (raw is Map) return _deepConvertMap(raw);
+      return null;
+    });
+  }
+
+  static Map<String, dynamic> _deepConvertMap(Map raw) {
+    return raw.map((key, value) {
+      if (value is Map) {
+        return MapEntry(key.toString(), _deepConvertMap(value));
+      }
+      return MapEntry(key.toString(), value);
     });
   }
 
