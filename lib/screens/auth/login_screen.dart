@@ -7,7 +7,7 @@ import '../../services/auth_service.dart';
 import '../../config/theme.dart';
 import 'signup_screen.dart';
 
-enum _LoginTab { email, phone, pin }
+enum _LoginTab { email, phone }
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -21,7 +21,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _pinController = TextEditingController();
   bool _obscurePassword = true;
   bool _rememberMe = true;
   _LoginTab _activeTab = _LoginTab.email;
@@ -64,7 +63,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _phoneController.dispose();
-    _pinController.dispose();
     super.dispose();
   }
 
@@ -81,10 +79,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     } else if (_activeTab == _LoginTab.phone) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Phone sign-in coming soon')),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('PIN sign-in coming soon')),
       );
     }
   }
@@ -160,7 +154,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   if (_activeTab == _LoginTab.email) _buildEmailFields(),
                   if (_activeTab == _LoginTab.phone) _buildPhoneFields(),
-                  if (_activeTab == _LoginTab.pin) _buildPinFields(),
 
                   const SizedBox(height: 20),
 
@@ -279,7 +272,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           _buildTab('Email', _LoginTab.email),
           _buildTab('Phone', _LoginTab.phone),
-          _buildTab('PIN', _LoginTab.pin),
         ],
       ),
     );
@@ -412,24 +404,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           },
         ),
       ],
-    );
-  }
-
-  Widget _buildPinFields() {
-    return _buildInputField(
-      controller: _pinController,
-      hint: 'Enter your PIN',
-      icon: Icons.dialpad,
-      keyboardType: TextInputType.number,
-      obscureText: true,
-      textInputAction: TextInputAction.done,
-      onFieldSubmitted: (_) => _signIn(),
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
-      validator: (v) {
-        if (v == null || v.isEmpty) return 'Please enter your PIN';
-        if (v.length < 4) return 'PIN must be at least 4 digits';
-        return null;
-      },
     );
   }
 

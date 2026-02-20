@@ -13,6 +13,8 @@ class SignupScreen extends ConsumerStatefulWidget {
 
 class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -26,6 +28,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   @override
   void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _passwordController.dispose();
@@ -36,9 +40,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   void _signUp() {
     if (_formKey.currentState!.validate()) {
       final phone = _phoneController.text.trim();
+      final first = _firstNameController.text.trim();
+      final last = _lastNameController.text.trim();
+      final displayName = [first, last].where((s) => s.isNotEmpty).join(' ');
       ref.read(authProvider.notifier).signUpWithEmail(
             email: _emailController.text.trim(),
             password: _passwordController.text,
+            displayName: displayName.isNotEmpty ? displayName : null,
             phone: phone.isNotEmpty ? '+1$phone' : null,
           );
     }
@@ -83,6 +91,37 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
                   ),
                   const SizedBox(height: 36),
+
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildField(
+                          controller: _firstNameController,
+                          hint: 'First Name',
+                          icon: Icons.person_outline,
+                          textCapitalization: TextCapitalization.words,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Required';
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildField(
+                          controller: _lastNameController,
+                          hint: 'Last Name',
+                          icon: Icons.person_outline,
+                          textCapitalization: TextCapitalization.words,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Required';
+                            return null;
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
 
                   _buildField(
                     controller: _emailController,
@@ -235,6 +274,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
     bool obscureText = false,
     Widget? suffixIcon,
     TextInputAction textInputAction = TextInputAction.next,
+    TextCapitalization textCapitalization = TextCapitalization.none,
     String? Function(String?)? validator,
   }) {
     return TextFormField(
@@ -242,6 +282,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       keyboardType: keyboardType,
       obscureText: obscureText,
       textInputAction: textInputAction,
+      textCapitalization: textCapitalization,
       style: const TextStyle(color: Colors.white, fontSize: 15),
       validator: validator,
       decoration: InputDecoration(
