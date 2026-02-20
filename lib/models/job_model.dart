@@ -143,6 +143,136 @@ class JobTracking {
   }
 }
 
+class SurgePricingData {
+  final double timeMultiplier;
+  final double dayMultiplier;
+  final double demandMultiplier;
+  final double holidayMultiplier;
+  final double combinedMultiplier;
+  final int surgeAmount;
+
+  const SurgePricingData({
+    this.timeMultiplier = 1.0,
+    this.dayMultiplier = 1.0,
+    this.demandMultiplier = 1.0,
+    this.holidayMultiplier = 1.0,
+    this.combinedMultiplier = 1.0,
+    this.surgeAmount = 0,
+  });
+
+  factory SurgePricingData.fromJson(Map<String, dynamic> json) {
+    return SurgePricingData(
+      timeMultiplier: (json['timeMultiplier'] as num?)?.toDouble() ?? 1.0,
+      dayMultiplier: (json['dayMultiplier'] as num?)?.toDouble() ?? 1.0,
+      demandMultiplier: (json['demandMultiplier'] as num?)?.toDouble() ?? 1.0,
+      holidayMultiplier: (json['holidayMultiplier'] as num?)?.toDouble() ?? 1.0,
+      combinedMultiplier: (json['combinedMultiplier'] as num?)?.toDouble() ?? 1.0,
+      surgeAmount: (json['surgeAmount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  bool get isActive => combinedMultiplier > 1.0;
+  String get formattedMultiplier => '${combinedMultiplier.toStringAsFixed(1)}x';
+}
+
+class AddOnFeesData {
+  final int priorityFee;
+  final int winchFee;
+  final int fuelFee;
+  final int afterHoursFee;
+  final int weekendFee;
+  final int holidayFee;
+  final int total;
+
+  const AddOnFeesData({
+    this.priorityFee = 0,
+    this.winchFee = 0,
+    this.fuelFee = 0,
+    this.afterHoursFee = 0,
+    this.weekendFee = 0,
+    this.holidayFee = 0,
+    this.total = 0,
+  });
+
+  factory AddOnFeesData.fromJson(Map<String, dynamic> json) {
+    return AddOnFeesData(
+      priorityFee: (json['priorityFee'] as num?)?.toInt() ?? 0,
+      winchFee: (json['winchFee'] as num?)?.toInt() ?? 0,
+      fuelFee: (json['fuelFee'] as num?)?.toInt() ?? 0,
+      afterHoursFee: (json['afterHoursFee'] as num?)?.toInt() ?? 0,
+      weekendFee: (json['weekendFee'] as num?)?.toInt() ?? 0,
+      holidayFee: (json['holidayFee'] as num?)?.toInt() ?? 0,
+      total: (json['total'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class DiscountData {
+  final int promoDiscount;
+  final String? promoCode;
+  final int membershipDiscount;
+  final String? membershipTier;
+  final int referralDiscount;
+  final int loyaltyPointsUsed;
+  final int loyaltyDiscount;
+  final int totalDiscount;
+
+  const DiscountData({
+    this.promoDiscount = 0,
+    this.promoCode,
+    this.membershipDiscount = 0,
+    this.membershipTier,
+    this.referralDiscount = 0,
+    this.loyaltyPointsUsed = 0,
+    this.loyaltyDiscount = 0,
+    this.totalDiscount = 0,
+  });
+
+  factory DiscountData.fromJson(Map<String, dynamic> json) {
+    return DiscountData(
+      promoDiscount: (json['promoDiscount'] as num?)?.toInt() ?? 0,
+      promoCode: json['promoCode'],
+      membershipDiscount: (json['membershipDiscount'] as num?)?.toInt() ?? 0,
+      membershipTier: json['membershipTier'],
+      referralDiscount: (json['referralDiscount'] as num?)?.toInt() ?? 0,
+      loyaltyPointsUsed: (json['loyaltyPointsUsed'] as num?)?.toInt() ?? 0,
+      loyaltyDiscount: (json['loyaltyDiscount'] as num?)?.toInt() ?? 0,
+      totalDiscount: (json['totalDiscount'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  bool get hasDiscount => totalDiscount > 0;
+  String get formattedDiscount => '-\$${(totalDiscount / 100).toStringAsFixed(2)}';
+}
+
+class HeroPayoutData {
+  final int basePayout;
+  final int distancePayout;
+  final int tierBonus;
+  final int performanceBonus;
+  final int totalPayout;
+
+  const HeroPayoutData({
+    this.basePayout = 0,
+    this.distancePayout = 0,
+    this.tierBonus = 0,
+    this.performanceBonus = 0,
+    this.totalPayout = 0,
+  });
+
+  factory HeroPayoutData.fromJson(Map<String, dynamic> json) {
+    return HeroPayoutData(
+      basePayout: (json['basePayout'] as num?)?.toInt() ?? 0,
+      distancePayout: (json['distancePayout'] as num?)?.toInt() ?? 0,
+      tierBonus: (json['tierBonus'] as num?)?.toInt() ?? 0,
+      performanceBonus: (json['performanceBonus'] as num?)?.toInt() ?? 0,
+      totalPayout: (json['totalPayout'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  String get formattedPayout => '\$${(totalPayout / 100).toStringAsFixed(2)}';
+}
+
 class JobPricing {
   final String currency;
   final int basePrice;
@@ -153,6 +283,27 @@ class JobPricing {
   final int serviceFee;
   final int total;
 
+  // Extended fields from v2 pricing engine
+  final double subTypeModifier;
+  final int subTypeAdditionalFee;
+  final int heroTravelFee;
+  final double heroTravelMiles;
+  final int towingDistanceFee;
+  final double towingDistanceMiles;
+  final double freeIncludedMiles;
+  final SurgePricingData surgePricing;
+  final AddOnFeesData addOns;
+  final int subtotalBeforeDiscounts;
+  final DiscountData discounts;
+  final int subtotalAfterDiscounts;
+  final double serviceFeePercent;
+  final double taxRate;
+  final int taxAmount;
+  final int estimatedMin;
+  final int estimatedMax;
+  final HeroPayoutData heroPayout;
+  final String? configVersion;
+
   const JobPricing({
     this.currency = 'usd',
     this.basePrice = 0,
@@ -162,20 +313,125 @@ class JobPricing {
     this.subtotal = 0,
     this.serviceFee = 0,
     this.total = 0,
+    this.subTypeModifier = 1.0,
+    this.subTypeAdditionalFee = 0,
+    this.heroTravelFee = 0,
+    this.heroTravelMiles = 0,
+    this.towingDistanceFee = 0,
+    this.towingDistanceMiles = 0,
+    this.freeIncludedMiles = 0,
+    this.surgePricing = const SurgePricingData(),
+    this.addOns = const AddOnFeesData(),
+    this.subtotalBeforeDiscounts = 0,
+    this.discounts = const DiscountData(),
+    this.subtotalAfterDiscounts = 0,
+    this.serviceFeePercent = 0,
+    this.taxRate = 0,
+    this.taxAmount = 0,
+    this.estimatedMin = 0,
+    this.estimatedMax = 0,
+    this.heroPayout = const HeroPayoutData(),
+    this.configVersion,
   });
 
   factory JobPricing.fromJson(Map<String, dynamic> json) {
     return JobPricing(
       currency: json['currency'] ?? 'usd',
-      basePrice: json['basePrice'] ?? 0,
-      mileagePrice: json['mileagePrice'] ?? 0,
-      priorityFee: json['priorityFee'] ?? 0,
-      winchFee: json['winchFee'] ?? 0,
-      subtotal: json['subtotal'] ?? 0,
-      serviceFee: json['serviceFee'] ?? 0,
-      total: json['total'] ?? 0,
+      basePrice: (json['basePrice'] as num?)?.toInt() ?? 0,
+      mileagePrice: (json['mileagePrice'] as num?)?.toInt() ?? 0,
+      priorityFee: (json['priorityFee'] as num?)?.toInt() ?? 0,
+      winchFee: (json['winchFee'] as num?)?.toInt() ?? 0,
+      subtotal: (json['subtotal'] as num?)?.toInt() ?? 0,
+      serviceFee: (json['serviceFee'] as num?)?.toInt() ?? 0,
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      subTypeModifier: (json['subTypeModifier'] as num?)?.toDouble() ?? 1.0,
+      subTypeAdditionalFee: (json['subTypeAdditionalFee'] as num?)?.toInt() ?? 0,
+      heroTravelFee: (json['heroTravelFee'] as num?)?.toInt() ?? 0,
+      heroTravelMiles: (json['heroTravelMiles'] as num?)?.toDouble() ?? 0,
+      towingDistanceFee: (json['towingDistanceFee'] as num?)?.toInt() ?? 0,
+      towingDistanceMiles: (json['towingDistanceMiles'] as num?)?.toDouble() ?? 0,
+      freeIncludedMiles: (json['freeIncludedMiles'] as num?)?.toDouble() ?? 0,
+      surgePricing: json['surgePricing'] != null
+          ? SurgePricingData.fromJson(json['surgePricing'] as Map<String, dynamic>)
+          : const SurgePricingData(),
+      addOns: json['addOns'] != null
+          ? AddOnFeesData.fromJson(json['addOns'] as Map<String, dynamic>)
+          : const AddOnFeesData(),
+      subtotalBeforeDiscounts: (json['subtotalBeforeDiscounts'] as num?)?.toInt() ?? 0,
+      discounts: json['discounts'] != null
+          ? DiscountData.fromJson(json['discounts'] as Map<String, dynamic>)
+          : const DiscountData(),
+      subtotalAfterDiscounts: (json['subtotalAfterDiscounts'] as num?)?.toInt() ?? 0,
+      serviceFeePercent: (json['serviceFeePercent'] as num?)?.toDouble() ?? 0,
+      taxRate: (json['taxRate'] as num?)?.toDouble() ?? 0,
+      taxAmount: (json['taxAmount'] as num?)?.toInt() ?? 0,
+      estimatedMin: (json['estimatedRange']?['min'] as num?)?.toInt() ?? (json['total'] as num?)?.toInt() ?? 0,
+      estimatedMax: (json['estimatedRange']?['max'] as num?)?.toInt() ?? 0,
+      heroPayout: json['heroPayout'] != null
+          ? HeroPayoutData.fromJson(json['heroPayout'] as Map<String, dynamic>)
+          : const HeroPayoutData(),
+      configVersion: json['configVersion'],
     );
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'currency': currency,
+      'basePrice': basePrice,
+      'mileagePrice': mileagePrice,
+      'priorityFee': priorityFee,
+      'winchFee': winchFee,
+      'subtotal': subtotal,
+      'serviceFee': serviceFee,
+      'total': total,
+      'subTypeModifier': subTypeModifier,
+      'subTypeAdditionalFee': subTypeAdditionalFee,
+      'heroTravelFee': heroTravelFee,
+      'heroTravelMiles': heroTravelMiles,
+      'towingDistanceFee': towingDistanceFee,
+      'towingDistanceMiles': towingDistanceMiles,
+      'freeIncludedMiles': freeIncludedMiles,
+      'surgePricing': {
+        'timeMultiplier': surgePricing.timeMultiplier,
+        'dayMultiplier': surgePricing.dayMultiplier,
+        'demandMultiplier': surgePricing.demandMultiplier,
+        'holidayMultiplier': surgePricing.holidayMultiplier,
+        'combinedMultiplier': surgePricing.combinedMultiplier,
+        'surgeAmount': surgePricing.surgeAmount,
+      },
+      'addOns': {
+        'priorityFee': addOns.priorityFee,
+        'winchFee': addOns.winchFee,
+        'fuelFee': addOns.fuelFee,
+        'afterHoursFee': addOns.afterHoursFee,
+        'total': addOns.total,
+      },
+      'subtotalBeforeDiscounts': subtotalBeforeDiscounts,
+      'discounts': {
+        'promoDiscount': discounts.promoDiscount,
+        if (discounts.promoCode != null) 'promoCode': discounts.promoCode,
+        'membershipDiscount': discounts.membershipDiscount,
+        'totalDiscount': discounts.totalDiscount,
+      },
+      'subtotalAfterDiscounts': subtotalAfterDiscounts,
+      'serviceFeePercent': serviceFeePercent,
+      'estimatedRange': {'min': estimatedMin, 'max': estimatedMax},
+      'heroPayout': {
+        'basePayout': heroPayout.basePayout,
+        'distancePayout': heroPayout.distancePayout,
+        'tierBonus': heroPayout.tierBonus,
+        'performanceBonus': heroPayout.performanceBonus,
+        'totalPayout': heroPayout.totalPayout,
+      },
+      if (configVersion != null) 'configVersion': configVersion,
+    };
+  }
+
+  bool get hasSurge => surgePricing.isActive;
+  bool get hasDiscounts => discounts.hasDiscount;
+  String get formattedTotal => '\$${(total / 100).toStringAsFixed(2)}';
+  String get formattedRange =>
+      '\$${(estimatedMin / 100).toStringAsFixed(2)} - \$${(estimatedMax / 100).toStringAsFixed(2)}';
 }
 
 class JobDispatch {

@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/job_model.dart';
 import '../models/location_model.dart';
 import '../services/firestore_service.dart';
 import '../services/payment_service.dart';
+import '../services/pricing_service.dart';
 import 'auth_provider.dart';
 
 class JobCreationState {
@@ -14,7 +16,11 @@ class JobCreationState {
   final LocationModel? destinationLocation;
   final String? destinationAddress;
   final JobPricing? pricing;
+  final bool isPriority;
+  final bool needsWinch;
+  final String? promoCode;
   final bool isLoading;
+  final bool isPriceLoading;
   final String? error;
 
   const JobCreationState({
@@ -26,7 +32,11 @@ class JobCreationState {
     this.destinationLocation,
     this.destinationAddress,
     this.pricing,
+    this.isPriority = false,
+    this.needsWinch = false,
+    this.promoCode,
     this.isLoading = false,
+    this.isPriceLoading = false,
     this.error,
   });
 
@@ -40,14 +50,17 @@ class JobCreationState {
 class JobCreationNotifier extends StateNotifier<JobCreationState> {
   final FirestoreService _firestoreService;
   final PaymentService _paymentService;
+  final PricingService _pricingService;
   final Ref _ref;
 
   JobCreationNotifier({
     required FirestoreService firestoreService,
     required PaymentService paymentService,
+    required PricingService pricingService,
     required Ref ref,
   })  : _firestoreService = firestoreService,
         _paymentService = paymentService,
+        _pricingService = pricingService,
         _ref = ref,
         super(const JobCreationState());
 
@@ -74,14 +87,48 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
     _recalculatePrice();
   }
 
-  void _recalculatePrice() {
+  void setPriority(bool value) {
+    state = state.copyWith(isPriority: value);
+    _recalculatePrice();
+  }
+
+  void setNeedsWinch(bool value) {
+    state = state.copyWith(needsWinch: value);
+    _recalculatePrice();
+  }
+
+  void setPromoCode(String? code) {
+    state = state.copyWith(promoCode: code);
+  }
+
+  Future<void> _recalculatePrice() async {
     if (state.serviceType == null || state.pickupLocation == null) return;
-    const distance = 5.0;
-    final pricing = _paymentService.calculatePrice(
-      serviceType: state.serviceType!,
-      distanceMiles: distance,
-    );
-    state = state.copyWith(pricing: pricing);
+    state = state.copyWith(isPriceLoading: true);
+
+    try {
+      final pricing = await _pricingService.calculatePrice(
+        serviceType: state.serviceType!,
+        serviceSubType: state.serviceSubType,
+        pickupLocation: state.pickupLocation!,
+        destinationLocation: state.destinationLocation,
+        isPriority: state.isPriority,
+        needsWinch: state.needsWinch,
+        promoCode: state.promoCode,
+      );
+      if (!mounted) return;
+      state = state.copyWith(pricing: pricing, isPriceLoading: false);
+    } catch (e) {
+      debugPrint('[JobCreation] Cloud pricing failed, using local fallback: $e');
+      // Fallback to local calculation
+      final pricing = _paymentService.calculatePrice(
+        serviceType: state.serviceType!,
+        distanceMiles: 5.0,
+        isPriority: state.isPriority,
+        needsWinch: state.needsWinch,
+      );
+      if (!mounted) return;
+      state = state.copyWith(pricing: pricing, isPriceLoading: false);
+    }
   }
 
   Future<String?> createJob() async {
@@ -123,16 +170,9 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
             },
             'address': {'formatted': state.destinationAddress},
           },
-        'pricing': {
-          'currency': state.pricing!.currency,
-          'basePrice': state.pricing!.basePrice,
-          'mileagePrice': state.pricing!.mileagePrice,
-          'priorityFee': state.pricing!.priorityFee,
-          'winchFee': state.pricing!.winchFee,
-          'subtotal': state.pricing!.subtotal,
-          'serviceFee': state.pricing!.serviceFee,
-          'total': state.pricing!.total,
-        },
+        'pricing': state.pricing!.toJson(),
+        if (state.promoCode != null)
+          'discounts': {'promoCode': state.promoCode},
       });
       state = state.copyWith(isLoading: false);
       return jobId;
@@ -157,7 +197,11 @@ extension _JobCreationCopyWith on JobCreationState {
     LocationModel? destinationLocation,
     String? destinationAddress,
     JobPricing? pricing,
+    bool? isPriority,
+    bool? needsWinch,
+    String? promoCode,
     bool? isLoading,
+    bool? isPriceLoading,
     String? error,
   }) {
     return JobCreationState(
@@ -169,7 +213,11 @@ extension _JobCreationCopyWith on JobCreationState {
       destinationLocation: destinationLocation ?? this.destinationLocation,
       destinationAddress: destinationAddress ?? this.destinationAddress,
       pricing: pricing ?? this.pricing,
+      isPriority: isPriority ?? this.isPriority,
+      needsWinch: needsWinch ?? this.needsWinch,
+      promoCode: promoCode ?? this.promoCode,
       isLoading: isLoading ?? this.isLoading,
+      isPriceLoading: isPriceLoading ?? this.isPriceLoading,
       error: error,
     );
   }
@@ -180,6 +228,7 @@ final jobCreationProvider =
   return JobCreationNotifier(
     firestoreService: FirestoreService(),
     paymentService: PaymentService(),
+    pricingService: PricingService(),
     ref: ref,
   );
 });

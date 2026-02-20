@@ -11,3 +11,12 @@ export { getOrCreateCustomer, addPaymentMethod } from "./payments/customer";
 export { cleanupExpiredLocations, cleanupOldJobs } from "./jobs/cleanup";
 export { onJobStatusChanged } from "./jobs/triggers";
 export { getRoute } from "./routing/getRoute";
+
+// Pricing engine
+export { calculateJobPrice, getQuickQuote } from "./pricing/calculatePrice";
+export { validatePromoCode, getServicePricing, incrementPromoCodeUsage } from "./pricing/promoCode";
+export { seedPricingConfig } from "./pricing/seedConfig";
+
+// Hero applications
+export { submitHeroApplication } from "./heroApplications/submitApplication";
+export { approveHeroApplication, rejectHeroApplication, requestMoreInfo } from "./heroApplications/approveApplication";

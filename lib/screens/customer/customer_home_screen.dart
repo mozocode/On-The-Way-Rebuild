@@ -16,8 +16,11 @@ import '../menu/assistance_history_screen.dart';
 import '../menu/messages_screen.dart';
 import '../menu/settings_screen.dart';
 import '../menu/invite_friends_screen.dart';
+import '../request/location_screen.dart';
+import '../request/service_subtype_screen.dart';
 import '../request/vehicle_info_screen.dart';
 import '../review/customer_review_screen.dart';
+import '../hero_onboarding/hero_onboarding_screen.dart';
 import 'tracking_screen.dart';
 
 class CustomerHomeScreen extends ConsumerStatefulWidget {
@@ -164,16 +167,82 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
                 label: item['label'] as String,
                 serviceId: item['serviceId'] as String,
                 onTap: () {
-                  ref.read(jobCreationProvider.notifier).setServiceType(item['serviceId'] as String);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => VehicleInfoScreen(
-                        serviceType: item['serviceId'] as String,
-                        serviceLabel: item['label'] as String,
+                  final serviceId = item['serviceId'] as String;
+                  final serviceLabel = item['label'] as String;
+                  ref.read(jobCreationProvider.notifier).setServiceType(serviceId);
+
+                  if (serviceId == 'towing') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ServiceSubTypeScreen(
+                          serviceType: serviceId,
+                          serviceLabel: serviceLabel,
+                          allowMultiple: true,
+                          options: const [
+                            SubTypeOption(
+                              id: 'tow',
+                              title: 'Tow',
+                              subtitle: 'Transport vehicle to another location',
+                              icon: Icons.local_shipping,
+                            ),
+                            SubTypeOption(
+                              id: 'winch',
+                              title: 'Winch',
+                              subtitle: 'Pull vehicle from stuck position',
+                              icon: Icons.link,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  );
+                    );
+                  } else if (serviceId == 'winch_out') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => LocationScreen(
+                          serviceType: serviceId,
+                          serviceLabel: serviceLabel,
+                          totalSteps: 3,
+                          currentStep: 1,
+                        ),
+                      ),
+                    );
+                  } else if (serviceId == 'dead_battery') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ServiceSubTypeScreen(
+                          serviceType: serviceId,
+                          serviceLabel: serviceLabel,
+                          options: const [
+                            SubTypeOption(
+                              id: 'standard_jump',
+                              title: 'Standard Battery Jump',
+                              subtitle: 'Traditional 12V battery jump start',
+                              icon: Icons.flash_on,
+                            ),
+                            SubTypeOption(
+                              id: 'ev_charge',
+                              title: 'Electric Vehicle Charge',
+                              subtitle: 'Mobile EV charging assistance',
+                              icon: Icons.ev_station,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => VehicleInfoScreen(
+                          serviceType: serviceId,
+                          serviceLabel: serviceLabel,
+                        ),
+                      ),
+                    );
+                  }
                 },
               );
             }).toList(),
@@ -759,7 +828,11 @@ class _MenuDrawer extends StatelessWidget {
           subtitle: 'Start earning as a hero',
           highlightColor: AppTheme.brandGreen,
           onTap: () {
-            // TODO: Navigate to hero application screen
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const HeroOnboardingScreen()),
+            );
           },
         ),
 

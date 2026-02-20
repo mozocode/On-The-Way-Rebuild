@@ -83,9 +83,18 @@ class _JobCompleteScreenState extends State<JobCompleteScreen> {
                     _PriceRow(
                         label: 'Base Price',
                         amount: widget.job.pricing.basePrice),
-                    _PriceRow(
-                        label: 'Mileage',
-                        amount: widget.job.pricing.mileagePrice),
+                    if (widget.job.pricing.heroTravelFee > 0)
+                      _PriceRow(
+                          label: 'Travel (${widget.job.pricing.heroTravelMiles.toStringAsFixed(1)} mi)',
+                          amount: widget.job.pricing.heroTravelFee),
+                    if (widget.job.pricing.heroTravelFee == 0)
+                      _PriceRow(
+                          label: 'Mileage',
+                          amount: widget.job.pricing.mileagePrice),
+                    if (widget.job.pricing.towingDistanceFee > 0)
+                      _PriceRow(
+                          label: 'Towing (${widget.job.pricing.towingDistanceMiles.toStringAsFixed(1)} mi)',
+                          amount: widget.job.pricing.towingDistanceFee),
                     if (widget.job.pricing.priorityFee > 0)
                       _PriceRow(
                           label: 'Priority Fee',
@@ -94,6 +103,18 @@ class _JobCompleteScreenState extends State<JobCompleteScreen> {
                       _PriceRow(
                           label: 'Winch Fee',
                           amount: widget.job.pricing.winchFee),
+                    if (widget.job.pricing.addOns.afterHoursFee > 0)
+                      _PriceRow(
+                          label: 'After Hours Fee',
+                          amount: widget.job.pricing.addOns.afterHoursFee),
+                    if (widget.job.pricing.surgePricing.surgeAmount > 0)
+                      _PriceRow(
+                          label: 'Surge (${widget.job.pricing.surgePricing.formattedMultiplier})',
+                          amount: widget.job.pricing.surgePricing.surgeAmount),
+                    if (widget.job.pricing.discounts.totalDiscount > 0)
+                      _PriceRow(
+                          label: 'Discount',
+                          amount: -widget.job.pricing.discounts.totalDiscount),
                     _PriceRow(
                         label: 'Service Fee',
                         amount: widget.job.pricing.serviceFee),

@@ -9,11 +9,15 @@ import 'location_screen.dart';
 class VehicleInfoScreen extends StatefulWidget {
   final String serviceType;
   final String serviceLabel;
+  final String? subType;
+  final int totalSteps;
 
   const VehicleInfoScreen({
     super.key,
     required this.serviceType,
     required this.serviceLabel,
+    this.subType,
+    this.totalSteps = 3,
   });
 
   @override
@@ -28,6 +32,7 @@ class _VehicleInfoScreenState extends State<VehicleInfoScreen> {
   XFile? _vehicleImage;
   bool _dataLoaded = false;
   String? _loadError;
+  bool _isMotorcycle = false;
   final ImagePicker _imagePicker = ImagePicker();
 
   @override
@@ -130,7 +135,10 @@ class _VehicleInfoScreenState extends State<VehicleInfoScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const StepProgressIndicator(currentStep: 1),
+                  StepProgressIndicator(
+                    currentStep: widget.totalSteps == 4 ? 2 : 1,
+                    totalSteps: widget.totalSteps,
+                  ),
                 ],
               ),
             ),
@@ -147,6 +155,46 @@ class _VehicleInfoScreenState extends State<VehicleInfoScreen> {
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
                     ),
                     const SizedBox(height: 20),
+
+                    if (widget.serviceType == 'towing') ...[
+                      Row(
+                        children: [
+                          Icon(Icons.two_wheeler,
+                              size: 24, color: AppTheme.brandGreen),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Motorcycle / Recreation Vehicle',
+                                  style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600),
+                                ),
+                                Text(
+                                  'ATVs, UTVs, Scooters, Snowmobiles, etc.',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey[500]),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Switch(
+                            value: _isMotorcycle,
+                            activeColor: AppTheme.brandGreen,
+                            onChanged: (v) => setState(() {
+                              _isMotorcycle = v;
+                              _selectedYear = null;
+                              _selectedMake = null;
+                              _selectedModel = null;
+                              _selectedColor = null;
+                            }),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                    ],
 
                     // Year – scrollable list (47 options)
                     _buildScrollableSelectField(
@@ -295,6 +343,9 @@ class _VehicleInfoScreenState extends State<VehicleInfoScreen> {
           serviceType: widget.serviceType,
           serviceLabel: widget.serviceLabel,
           vehicleInfo: vehicleInfo,
+          subType: widget.subType,
+          totalSteps: widget.totalSteps,
+          isMotorcycle: _isMotorcycle,
         ),
       ),
     );

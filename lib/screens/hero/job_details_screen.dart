@@ -179,11 +179,26 @@ class JobDetailsScreen extends StatelessWidget {
                       child: Column(
                         children: [
                           _EarningsRow('Base', job.pricing.basePrice),
-                          _EarningsRow('Mileage', job.pricing.mileagePrice),
+                          if (job.pricing.heroTravelFee > 0)
+                            _EarningsRow(
+                              'Travel (${job.pricing.heroTravelMiles.toStringAsFixed(1)} mi)',
+                              job.pricing.heroTravelFee,
+                            ),
+                          if (job.pricing.heroTravelFee == 0)
+                            _EarningsRow('Mileage', job.pricing.mileagePrice),
+                          if (job.pricing.towingDistanceFee > 0)
+                            _EarningsRow(
+                              'Towing (${job.pricing.towingDistanceMiles.toStringAsFixed(1)} mi)',
+                              job.pricing.towingDistanceFee,
+                            ),
                           if (job.pricing.priorityFee > 0)
                             _EarningsRow('Priority', job.pricing.priorityFee),
                           if (job.pricing.winchFee > 0)
                             _EarningsRow('Winch', job.pricing.winchFee),
+                          if (job.pricing.addOns.afterHoursFee > 0)
+                            _EarningsRow('After Hours', job.pricing.addOns.afterHoursFee),
+                          if (job.pricing.surgePricing.surgeAmount > 0)
+                            _EarningsRow('Surge', job.pricing.surgePricing.surgeAmount),
                           const Divider(height: 20),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -192,8 +207,10 @@ class JobDetailsScreen extends StatelessWidget {
                                   style:
                                       TextStyle(fontWeight: FontWeight.bold)),
                               Text(
-                                Formatters.currency(
-                                    job.pricing.total - job.pricing.serviceFee),
+                                job.pricing.heroPayout.totalPayout > 0
+                                    ? job.pricing.heroPayout.formattedPayout
+                                    : Formatters.currency(
+                                        job.pricing.total - job.pricing.serviceFee),
                                 style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: AppTheme.brandGreen),

@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../models/location_model.dart';
 import '../../providers/job_provider.dart';
-import '../../services/payment_service.dart';
 import '../../widgets/common/step_progress_indicator.dart';
+import '../../widgets/pricing/price_breakdown_card.dart';
+import '../../widgets/pricing/promo_code_input.dart';
 import '../customer/tracking_screen.dart';
 
 class ConfirmRequestScreen extends ConsumerStatefulWidget {
@@ -15,6 +16,13 @@ class ConfirmRequestScreen extends ConsumerStatefulWidget {
   final double latitude;
   final double longitude;
   final String notes;
+  final String? subType;
+  final int totalSteps;
+  final String? destinationAddress;
+  final double? destinationLatitude;
+  final double? destinationLongitude;
+  final String? rideType;
+  final int extraStops;
 
   const ConfirmRequestScreen({
     super.key,
@@ -25,6 +33,13 @@ class ConfirmRequestScreen extends ConsumerStatefulWidget {
     required this.latitude,
     required this.longitude,
     required this.notes,
+    this.subType,
+    this.totalSteps = 3,
+    this.destinationAddress,
+    this.destinationLatitude,
+    this.destinationLongitude,
+    this.rideType,
+    this.extraStops = 0,
   });
 
   @override
@@ -32,17 +47,20 @@ class ConfirmRequestScreen extends ConsumerStatefulWidget {
 }
 
 class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
-  bool _priorityMatch = false;
   bool _isSubmitting = false;
-  final _paymentService = PaymentService();
 
-  double get _total {
-    final pricing = _paymentService.calculatePrice(
-      serviceType: widget.serviceType,
-      distanceMiles: 5.0,
-      isPriority: _priorityMatch,
-    );
-    return pricing.total / 100.0;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final notifier = ref.read(jobCreationProvider.notifier);
+      notifier.setServiceType(widget.serviceType, subType: widget.subType);
+      notifier.setPickupLocation(
+        LocationModel(latitude: widget.latitude, longitude: widget.longitude),
+        widget.address,
+        notes: widget.notes.isNotEmpty ? widget.notes : null,
+      );
+    });
   }
 
   bool get _isLateNight {
@@ -50,18 +68,44 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
     return hour >= 22 || hour < 6;
   }
 
+  Widget _buildInfoRow({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 18, color: iconColor),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: TextStyle(fontSize: 12, color: Colors.grey[500])),
+              const SizedBox(height: 2),
+              Text(value, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatSubType(String subType) {
+    return subType.split('+').map((s) {
+      return s.replaceAll('_', ' ').split(' ').map((w) {
+        if (w.isEmpty) return w;
+        return '${w[0].toUpperCase()}${w.substring(1)}';
+      }).join(' ');
+    }).join(' + ');
+  }
+
   Future<void> _submitRequest() async {
     setState(() => _isSubmitting = true);
 
-    final notifier = ref.read(jobCreationProvider.notifier);
-    notifier.setServiceType(widget.serviceType);
-    notifier.setPickupLocation(
-      LocationModel(latitude: widget.latitude, longitude: widget.longitude),
-      widget.address,
-      notes: widget.notes.isNotEmpty ? widget.notes : null,
-    );
-
-    final jobId = await notifier.createJob();
+    final jobId = await ref.read(jobCreationProvider.notifier).createJob();
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
@@ -87,6 +131,10 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final jobState = ref.watch(jobCreationProvider);
+    final pricing = jobState.pricing;
+    final total = pricing != null ? pricing.total / 100.0 : 0.0;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
@@ -115,7 +163,10 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                     ],
                   ),
                   const SizedBox(height: 12),
-                  const StepProgressIndicator(currentStep: 3),
+                  StepProgressIndicator(
+                    currentStep: widget.totalSteps,
+                    totalSteps: widget.totalSteps,
+                  ),
                 ],
               ),
             ),
@@ -150,15 +201,45 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                           ),
                           const SizedBox(height: 4),
-                          Text(
-                            '\$${_total.toStringAsFixed(2)}',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.w800,
-                              color: AppTheme.brandGreen,
+                          if (jobState.isPriceLoading)
+                            const SizedBox(
+                              width: 24, height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            Text(
+                              '\$${total.toStringAsFixed(2)}',
+                              style: TextStyle(
+                                fontSize: 32,
+                                fontWeight: FontWeight.w800,
+                                color: AppTheme.brandGreen,
+                              ),
                             ),
-                          ),
-                          if (_isLateNight) ...[
+                          if (pricing != null && pricing.hasSurge) ...[
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.trending_up, size: 14, color: Colors.orange[700]),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Surge ${pricing.surgePricing.formattedMultiplier}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: Colors.orange[700],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else if (_isLateNight) ...[
                             const SizedBox(height: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -224,67 +305,78 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                             ),
                           ),
                           Switch(
-                            value: _priorityMatch,
-                            onChanged: (v) => setState(() => _priorityMatch = v),
+                            value: jobState.isPriority,
+                            onChanged: (v) =>
+                                ref.read(jobCreationProvider.notifier).setPriority(v),
                             activeColor: AppTheme.brandGreen,
                           ),
                         ],
                       ),
                     ),
 
-                    const SizedBox(height: 20),
-
-                    // Service Location
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.location_on, size: 18, color: AppTheme.brandGreen),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Service Location',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                widget.address,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-
                     const SizedBox(height: 16),
 
-                    // Vehicle
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.directions_car, size: 18, color: Colors.grey[600]),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Vehicle',
-                                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                widget.vehicleInfo,
-                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
+                    // Promo code
+                    const PromoCodeInput(),
+
+                    const SizedBox(height: 20),
+
+                    // Price breakdown (expandable)
+                    if (pricing != null) PriceBreakdownCard(pricing: pricing),
+
+                    const SizedBox(height: 20),
+
+                    // Pickup
+                    _buildInfoRow(
+                      icon: Icons.location_on,
+                      iconColor: AppTheme.brandGreen,
+                      label: widget.destinationAddress != null ? 'Pickup' : 'Service Location',
+                      value: widget.address,
                     ),
+
+                    // Destination (towing only)
+                    if (widget.destinationAddress != null) ...[
+                      const SizedBox(height: 16),
+                      _buildInfoRow(
+                        icon: Icons.flag,
+                        iconColor: Colors.red,
+                        label: 'Destination',
+                        value: widget.destinationAddress!,
+                      ),
+                    ],
+
+                    // Vehicle (hidden for transportation)
+                    if (widget.vehicleInfo.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _buildInfoRow(
+                        icon: Icons.directions_car,
+                        iconColor: Colors.grey[600]!,
+                        label: 'Vehicle',
+                        value: widget.vehicleInfo,
+                      ),
+                    ],
+
+                    // Services (when subType is set)
+                    if (widget.subType != null && widget.subType!.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      _buildInfoRow(
+                        icon: Icons.build,
+                        iconColor: Colors.grey[600]!,
+                        label: 'Services',
+                        value: _formatSubType(widget.subType!),
+                      ),
+                    ],
+
+                    // Ride Type (transportation only)
+                    if (widget.rideType != null) ...[
+                      const SizedBox(height: 16),
+                      _buildInfoRow(
+                        icon: Icons.directions_car,
+                        iconColor: Colors.grey[600]!,
+                        label: 'Ride Type',
+                        value: widget.rideType!,
+                      ),
+                    ],
 
                     const SizedBox(height: 20),
 
@@ -297,9 +389,7 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                         GestureDetector(
-                          onTap: () {
-                            // TODO: Change payment method
-                          },
+                          onTap: () {},
                           child: Text(
                             'Change',
                             style: TextStyle(
@@ -348,23 +438,6 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                         ],
                       ),
                     ),
-
-                    const SizedBox(height: 24),
-
-                    // Total
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'Total',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                        ),
-                        Text(
-                          '\$${_total.toStringAsFixed(2)}',
-                          style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w800),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -377,7 +450,9 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                 width: double.infinity,
                 height: 52,
                 child: ElevatedButton(
-                  onPressed: _isSubmitting ? null : _submitRequest,
+                  onPressed: (_isSubmitting || jobState.isPriceLoading)
+                      ? null
+                      : _submitRequest,
                   child: _isSubmitting
                       ? const SizedBox(
                           width: 24,
@@ -390,7 +465,8 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                       : const Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            Text('Confirm & Request Hero', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            Text('Confirm & Request Hero',
+                                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                             SizedBox(width: 8),
                             Icon(Icons.arrow_forward, size: 20),
                           ],
