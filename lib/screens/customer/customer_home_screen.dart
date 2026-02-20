@@ -75,7 +75,9 @@ class _CustomerHomeScreenState extends ConsumerState<CustomerHomeScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final activeJob = ref.watch(activeCustomerJobProvider);
-    final firstName = user?.firstName ?? user?.displayName ?? 'there';
+    final firstName = user?.firstName
+        ?? user?.displayName?.split(' ').first
+        ?? 'there';
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
 

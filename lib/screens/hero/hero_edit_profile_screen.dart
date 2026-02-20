@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/firestore_service.dart';
 
-/// Hero Edit Profile: avatar, Full Name, Email (read-only), Phone, Save.
 class HeroEditProfileScreen extends ConsumerStatefulWidget {
   const HeroEditProfileScreen({super.key});
 
@@ -12,30 +12,74 @@ class HeroEditProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
-  late TextEditingController _nameController;
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
   late TextEditingController _phoneController;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     final user = ref.read(currentUserProvider);
-    _nameController = TextEditingController(text: user?.displayName ?? '');
+    final displayParts = (user?.displayName ?? '').split(' ');
+    _firstNameController = TextEditingController(
+      text: user?.firstName ?? (displayParts.isNotEmpty ? displayParts.first : ''),
+    );
+    _lastNameController = TextEditingController(
+      text: user?.lastName ?? (displayParts.length > 1 ? displayParts.sublist(1).join(' ') : ''),
+    );
     _phoneController = TextEditingController(text: user?.phone ?? '');
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveProfile() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    final first = _firstNameController.text.trim();
+    final last = _lastNameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final displayName = [first, last].where((s) => s.isNotEmpty).join(' ');
+
+    setState(() => _isSaving = true);
+    try {
+      await FirestoreService().updateUser(user.id, {
+        'firstName': first,
+        'lastName': last,
+        'displayName': displayName,
+        'phone': phone.isNotEmpty ? phone : null,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final email = user?.email ?? '';
-    final name = user?.displayName ?? '';
-    final initial = name.isNotEmpty ? name[0].toUpperCase() : 'H';
+    final initial = _firstNameController.text.isNotEmpty
+        ? _firstNameController.text[0].toUpperCase()
+        : 'H';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
@@ -49,13 +93,17 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
         title: const Text('Edit Profile', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         centerTitle: true,
         actions: [
-          TextButton(
-            onPressed: () {
-              // TODO: persist name/phone to Firestore
-              Navigator.pop(context);
-            },
-            child: const Text('Save', style: TextStyle(color: AppTheme.brandGreen, fontWeight: FontWeight.w600)),
-          ),
+          _isSaving
+              ? const Padding(
+                  padding: EdgeInsets.only(right: 16),
+                  child: Center(
+                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                  ),
+                )
+              : TextButton(
+                  onPressed: _saveProfile,
+                  child: const Text('Save', style: TextStyle(color: AppTheme.brandGreen, fontWeight: FontWeight.w600)),
+                ),
         ],
       ),
       body: SafeArea(
@@ -64,9 +112,7 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
           child: Column(
             children: [
               GestureDetector(
-                onTap: () {
-                  // TODO: image_picker for profile photo
-                },
+                onTap: () {},
                 child: Stack(
                   alignment: Alignment.bottomRight,
                   children: [
@@ -89,11 +135,29 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
               const SizedBox(height: 8),
               Text('Tap to change photo', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
               const SizedBox(height: 32),
-              _ProfileField(
-                label: 'Full Name',
-                icon: Icons.person_outline,
-                controller: _nameController,
-                hint: 'Full name',
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _ProfileField(
+                      label: 'First Name',
+                      icon: Icons.person_outline,
+                      controller: _firstNameController,
+                      hint: 'First',
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _ProfileField(
+                      label: 'Last Name',
+                      icon: Icons.person_outline,
+                      controller: _lastNameController,
+                      hint: 'Last',
+                      textCapitalization: TextCapitalization.words,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 20),
               _ReadOnlyField(
@@ -125,6 +189,7 @@ class _ProfileField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final TextInputType? keyboardType;
+  final TextCapitalization textCapitalization;
 
   const _ProfileField({
     required this.label,
@@ -132,6 +197,7 @@ class _ProfileField extends StatelessWidget {
     required this.controller,
     required this.hint,
     this.keyboardType,
+    this.textCapitalization = TextCapitalization.none,
   });
 
   @override
@@ -144,6 +210,7 @@ class _ProfileField extends StatelessWidget {
         TextField(
           controller: controller,
           keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(icon, size: 20, color: Colors.grey[600]),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/firestore_service.dart';
 import '../../config/theme.dart';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
@@ -11,36 +12,80 @@ class EditProfileScreen extends ConsumerStatefulWidget {
 }
 
 class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
-  late TextEditingController _nameController;
+  late TextEditingController _firstNameController;
+  late TextEditingController _lastNameController;
   late TextEditingController _phoneController;
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
     final user = ref.read(currentUserProvider);
-    _nameController = TextEditingController(text: user?.displayName ?? '');
+    final displayParts = (user?.displayName ?? '').split(' ');
+    _firstNameController = TextEditingController(
+      text: user?.firstName ?? (displayParts.isNotEmpty ? displayParts.first : ''),
+    );
+    _lastNameController = TextEditingController(
+      text: user?.lastName ?? (displayParts.length > 1 ? displayParts.sublist(1).join(' ') : ''),
+    );
     _phoneController = TextEditingController(text: user?.phone ?? '');
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _phoneController.dispose();
     super.dispose();
+  }
+
+  Future<void> _saveProfile() async {
+    final user = ref.read(currentUserProvider);
+    if (user == null) return;
+
+    final first = _firstNameController.text.trim();
+    final last = _lastNameController.text.trim();
+    final phone = _phoneController.text.trim();
+    final displayName = [first, last].where((s) => s.isNotEmpty).join(' ');
+
+    setState(() => _isSaving = true);
+    try {
+      await FirestoreService().updateUser(user.id, {
+        'firstName': first,
+        'lastName': last,
+        'displayName': displayName,
+        'phone': phone.isNotEmpty ? phone : null,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Profile updated')),
+        );
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to save: $e'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final email = user?.email ?? '';
-    final initial = (user?.displayName ?? 'U')[0].toUpperCase();
+    final initial = _firstNameController.text.isNotEmpty
+        ? _firstNameController.text[0].toUpperCase()
+        : (user?.displayName ?? 'U')[0].toUpperCase();
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       body: SafeArea(
         child: Column(
           children: [
-            // Header
             Container(
               color: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -58,18 +103,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     ),
                   ),
                   GestureDetector(
-                    onTap: () {
-                      // TODO: Save profile
-                      Navigator.pop(context);
-                    },
-                    child: Text(
-                      'Save',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.brandGreen,
-                      ),
-                    ),
+                    onTap: _isSaving ? null : _saveProfile,
+                    child: _isSaving
+                        ? const SizedBox(
+                            width: 20, height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(
+                            'Save',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.brandGreen,
+                            ),
+                          ),
                   ),
                 ],
               ),
@@ -81,7 +128,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Avatar
                     Center(
                       child: Column(
                         children: [
@@ -129,28 +175,66 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
                     const SizedBox(height: 32),
 
-                    // Full Name
-                    const Text(
-                      'Full Name',
-                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _nameController,
-                      decoration: InputDecoration(
-                        prefixIcon: Icon(Icons.person_outline, color: Colors.grey[400]),
-                        filled: true,
-                        fillColor: Colors.white,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'First Name',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _firstNameController,
+                                textCapitalization: TextCapitalization.words,
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(Icons.person_outline, color: Colors.grey[400]),
+                                  hintText: 'First',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text(
+                                'Last Name',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: _lastNameController,
+                                textCapitalization: TextCapitalization.words,
+                                decoration: InputDecoration(
+                                  prefixIcon: Icon(Icons.person_outline, color: Colors.grey[400]),
+                                  hintText: 'Last',
+                                  filled: true,
+                                  fillColor: Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                    borderSide: BorderSide.none,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
 
                     const SizedBox(height: 24),
 
-                    // Email
                     const Text(
                       'Email',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87),
@@ -178,7 +262,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
                     const SizedBox(height: 24),
 
-                    // Phone Number
                     const Text(
                       'Phone Number',
                       style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black87),
