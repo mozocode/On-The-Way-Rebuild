@@ -34,6 +34,11 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read, create: if isAuthenticated();
       }
+
+      match /reviews/{reviewId} {
+        allow read: if isAuthenticated();
+        allow create, update: if isAuthenticated();
+      }
     }
 
     match /dispatchWaves/{jobId} {
