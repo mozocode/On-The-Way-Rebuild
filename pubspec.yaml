@@ -18,6 +18,7 @@ dependencies:
   firebase_messaging: ^15.2.1
   firebase_analytics: ^11.4.1
   cloud_functions: ^5.2.1
+  firebase_storage: ^12.4.1
 
   # Radar.com - Flutter SDK (includes location/tracking; map via maplibre_gl + Radar styles)
   flutter_radar: ^3.9.0
