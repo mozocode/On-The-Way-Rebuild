@@ -1,5 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../../config/theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/firestore_service.dart';
@@ -16,6 +19,8 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
   late TextEditingController _lastNameController;
   late TextEditingController _phoneController;
   bool _isSaving = false;
+  File? _pickedImage;
+  bool _isUploadingPhoto = false;
 
   @override
   void initState() {
@@ -39,6 +44,84 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
     super.dispose();
   }
 
+  Future<void> _pickImage() async {
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.only(bottom: 16),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.camera_alt_outlined),
+                title: const Text('Take Photo'),
+                onTap: () => Navigator.pop(ctx, ImageSource.camera),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('Choose from Library'),
+                onTap: () => Navigator.pop(ctx, ImageSource.gallery),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (source == null) return;
+
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 512,
+      maxHeight: 512,
+      imageQuality: 80,
+    );
+
+    if (picked != null) {
+      setState(() => _pickedImage = File(picked.path));
+    }
+  }
+
+  Future<String?> _uploadPhoto(String userId) async {
+    if (_pickedImage == null) return null;
+
+    setState(() => _isUploadingPhoto = true);
+    try {
+      final ext = _pickedImage!.path.split('.').last.toLowerCase();
+      final storagePath = 'profile_photos/$userId/avatar_${DateTime.now().millisecondsSinceEpoch}.$ext';
+      final ref = FirebaseStorage.instance.ref(storagePath);
+
+      await ref.putFile(
+        _pickedImage!,
+        SettableMetadata(contentType: ext == 'png' ? 'image/png' : 'image/jpeg'),
+      );
+
+      return await ref.getDownloadURL();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Photo upload failed: $e'), backgroundColor: Colors.red),
+        );
+      }
+      return null;
+    } finally {
+      if (mounted) setState(() => _isUploadingPhoto = false);
+    }
+  }
+
   Future<void> _saveProfile() async {
     final user = ref.read(currentUserProvider);
     if (user == null) return;
@@ -50,12 +133,21 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
 
     setState(() => _isSaving = true);
     try {
-      await FirestoreService().updateUser(user.id, {
+      final updates = <String, dynamic>{
         'firstName': first,
         'lastName': last,
         'displayName': displayName,
         'phone': phone.isNotEmpty ? phone : null,
-      });
+      };
+
+      if (_pickedImage != null) {
+        final photoUrl = await _uploadPhoto(user.id);
+        if (photoUrl != null) {
+          updates['photoUrl'] = photoUrl;
+        }
+      }
+
+      await FirestoreService().updateUser(user.id, updates);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Profile updated')),
@@ -77,6 +169,7 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
   Widget build(BuildContext context) {
     final user = ref.watch(currentUserProvider);
     final email = user?.email ?? '';
+    final photoUrl = user?.photoUrl;
     final initial = _firstNameController.text.isNotEmpty
         ? _firstNameController.text[0].toUpperCase()
         : 'H';
@@ -93,7 +186,7 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
         title: const Text('Edit Profile', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         centerTitle: true,
         actions: [
-          _isSaving
+          (_isSaving || _isUploadingPhoto)
               ? const Padding(
                   padding: EdgeInsets.only(right: 16),
                   child: Center(
@@ -112,28 +205,37 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
           child: Column(
             children: [
               GestureDetector(
-                onTap: () {},
-                child: Stack(
-                  alignment: Alignment.bottomRight,
+                onTap: _pickImage,
+                child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: AppTheme.brandGreen.withOpacity(0.2),
-                      child: Text(
-                        initial,
-                        style: const TextStyle(color: AppTheme.brandGreen, fontSize: 40, fontWeight: FontWeight.bold),
-                      ),
+                    Stack(
+                      alignment: Alignment.bottomRight,
+                      children: [
+                        CircleAvatar(
+                          radius: 50,
+                          backgroundColor: AppTheme.brandGreen.withOpacity(0.2),
+                          backgroundImage: _pickedImage != null
+                              ? FileImage(_pickedImage!)
+                              : (photoUrl != null ? NetworkImage(photoUrl) : null),
+                          child: (_pickedImage == null && photoUrl == null)
+                              ? Text(
+                                  initial,
+                                  style: const TextStyle(color: AppTheme.brandGreen, fontSize: 40, fontWeight: FontWeight.bold),
+                                )
+                              : null,
+                        ),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: const BoxDecoration(color: AppTheme.brandGreen, shape: BoxShape.circle),
+                          child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                        ),
+                      ],
                     ),
-                    Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: const BoxDecoration(color: AppTheme.brandGreen, shape: BoxShape.circle),
-                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
-                    ),
+                    const SizedBox(height: 8),
+                    Text('Tap to change photo', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
                   ],
                 ),
               ),
-              const SizedBox(height: 8),
-              Text('Tap to change photo', style: TextStyle(fontSize: 13, color: Colors.grey[600])),
               const SizedBox(height: 32),
 
               Row(

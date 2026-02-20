@@ -26,6 +26,10 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>On The Way needs camera access to take a profile photo.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>On The Way needs photo library access to choose a profile photo.</string>
 	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
 	<string>On The Way uses background location when you are in Hero mode so we can match you with nearby customers and track assistance trips.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
