@@ -69,14 +69,20 @@ export const onJobStatusChanged = functions.firestore
           ]),
         });
 
-        // Free the hero
+        // Free the hero and credit earnings (pending payout for Stripe Connect withdrawal)
         const heroId = after.hero?.id;
+        const heroPayoutCents = after.pricing?.heroPayout?.totalPayout ?? 0;
         if (heroId) {
-          await firestore.collection("heroes").doc(heroId).update({
+          const updateData: Record<string, unknown> = {
             "status.currentJobId": FieldValue.delete(),
             "stats.totalJobs": FieldValue.increment(1),
             updatedAt: FieldValue.serverTimestamp(),
-          });
+          };
+          if (heroPayoutCents > 0) {
+            updateData["earnings.totalEarned"] = FieldValue.increment(heroPayoutCents);
+            updateData["earnings.pendingPayout"] = FieldValue.increment(heroPayoutCents);
+          }
+          await firestore.collection("heroes").doc(heroId).update(updateData);
         }
 
         // Clean up realtime tracking

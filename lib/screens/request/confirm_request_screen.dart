@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
 import '../../models/location_model.dart';
 import '../../providers/job_provider.dart';
+import '../../services/stripe_service.dart';
 import '../../widgets/common/step_progress_indicator.dart';
 import '../../widgets/pricing/price_breakdown_card.dart';
 import '../../widgets/pricing/promo_code_input.dart';
@@ -103,9 +104,47 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
   }
 
   Future<void> _submitRequest() async {
+    final jobState = ref.read(jobCreationProvider);
+    final pricing = jobState.pricing;
+    if (pricing == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Loading price…'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+    final amountCents = pricing.total;
+
     setState(() => _isSubmitting = true);
 
-    final jobId = await ref.read(jobCreationProvider.notifier).createJob();
+    String? paymentIntentId;
+    try {
+      paymentIntentId = await StripeService().payWithPaymentSheet(
+        amountCents: amountCents,
+        currency: pricing.currency,
+        merchantDisplayName: 'On The Way',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(e.toString().contains('Canceled') ? 'Payment canceled' : 'Payment failed: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    if (!mounted) return;
+    if (paymentIntentId == null) {
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Payment canceled'), backgroundColor: Colors.orange),
+      );
+      return;
+    }
+
+    final jobId = await ref.read(jobCreationProvider.notifier).createJob(paymentIntentId: paymentIntentId);
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);

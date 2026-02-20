@@ -47,6 +47,9 @@ app.*.map.json
 # Cloud Functions build artifacts & dependencies
 functions/node_modules/
 functions/lib/
+functions/.env
+functions/.env.*
+!functions/.env.example
 
 # Firebase local config
 .firebaserc

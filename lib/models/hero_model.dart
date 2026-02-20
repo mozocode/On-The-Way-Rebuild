@@ -97,6 +97,7 @@ class HeroModel {
   final int ratingCount;
   final int totalEarned;
   final int pendingPayout;
+  final String? stripeConnectAccountId;
   final int totalJobs;
   final double completionRate;
   final double acceptanceRate;
@@ -121,6 +122,7 @@ class HeroModel {
     this.ratingCount = 0,
     this.totalEarned = 0,
     this.pendingPayout = 0,
+    this.stripeConnectAccountId,
     this.totalJobs = 0,
     this.completionRate = 0.0,
     this.acceptanceRate = 0.0,
@@ -173,6 +175,7 @@ class HeroModel {
       ratingCount: data['ratings']?['count'] ?? 0,
       totalEarned: data['earnings']?['totalEarned'] ?? 0,
       pendingPayout: data['earnings']?['pendingPayout'] ?? 0,
+      stripeConnectAccountId: data['earnings']?['stripeConnectAccountId'],
       totalJobs: data['stats']?['totalJobs'] ?? 0,
       completionRate:
           (data['stats']?['completionRate'] as num?)?.toDouble() ?? 0.0,

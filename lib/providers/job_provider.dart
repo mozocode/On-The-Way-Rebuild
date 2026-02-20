@@ -131,7 +131,8 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
     }
   }
 
-  Future<String?> createJob() async {
+  /// Creates the job. Pass [paymentIntentId] after successful Stripe payment.
+  Future<String?> createJob({String? paymentIntentId}) async {
     if (!state.isValid) {
       state = state.copyWith(error: 'Please fill in all required fields');
       return null;
@@ -143,7 +144,7 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
     }
     try {
       state = state.copyWith(isLoading: true, error: null);
-      final jobId = await _firestoreService.createJob({
+      final jobData = <String, dynamic>{
         'customer': {
           'id': user.id,
           'name': user.fullName,
@@ -173,7 +174,14 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
         'pricing': state.pricing!.toJson(),
         if (state.promoCode != null)
           'discounts': {'promoCode': state.promoCode},
-      });
+      };
+      if (paymentIntentId != null) {
+        jobData['payment'] = {
+          'paymentIntentId': paymentIntentId,
+          'status': 'succeeded',
+        };
+      }
+      final jobId = await _firestoreService.createJob(jobData);
       state = state.copyWith(isLoading: false);
       return jobId;
     } catch (e) {

@@ -36,8 +36,9 @@ dependencies:
   # Navigation
   go_router: ^13.0.1
 
-  # Auth - email/password only for now (Firebase Auth)
-  # sign_in_with_apple: ^5.0.0  # add later if needed
+  # Auth (Firebase Auth + social)
+  google_sign_in: ^6.2.2
+  sign_in_with_apple: ^5.0.0
 
   # UI Components
   flutter_svg: ^2.0.9
@@ -51,6 +52,7 @@ dependencies:
   flutter_local_notifications: ^17.0.0
 
   # Utilities
+  crypto: ^3.0.3
   uuid: ^4.2.2
   intl: ^0.18.1
   equatable: ^2.0.5
@@ -68,6 +70,9 @@ dependencies:
   # Connectivity
   connectivity_plus: ^5.0.2
   smooth_page_indicator: ^2.0.1
+
+  # Payments
+  flutter_stripe: ^11.2.0
 
 dev_dependencies:
   flutter_test:

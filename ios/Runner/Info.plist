@@ -30,6 +30,10 @@
 	<string>On The Way uses background location when you are in Hero mode so we can match you with nearby customers and track assistance trips.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>On The Way uses your location to show your position on the map and to receive nearby assistance requests when you are in Hero mode.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>On The Way uses the camera to take photos of your vehicle and identity documents for assistance requests.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>On The Way uses your photo library to attach photos of your vehicle or documents when requesting assistance.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

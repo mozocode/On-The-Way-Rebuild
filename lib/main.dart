@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/firebase_config.dart';
 import 'config/radar_config.dart';
+import 'config/stripe_config.dart';
+import 'package:flutter_stripe/flutter_stripe.dart';
 import 'services/notification_service.dart';
 import 'app.dart';
 
@@ -53,6 +55,10 @@ void main() async {
   print('[MAIN] starting Firebase init...');
   await FirebaseConfig.initialize();
   print('[MAIN] Firebase init done');
+
+  Stripe.publishableKey = StripeConfig.publishableKey;
+  Stripe.merchantIdentifier = StripeConfig.merchantIdentifier;
+  await Stripe.instance.applySettings();
 
   print('[MAIN] calling runApp...');
   runApp(
