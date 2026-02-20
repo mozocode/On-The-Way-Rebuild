@@ -143,6 +143,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
     String? displayName,
+    String? phone,
   }) async {
     try {
       state = state.copyWith(isLoading: true, error: null);
@@ -150,6 +151,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: email,
         password: password,
         displayName: displayName,
+        phone: phone,
       );
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(

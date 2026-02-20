@@ -30,6 +30,7 @@ class AuthService {
     required String email,
     required String password,
     String? displayName,
+    String? phone,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
       email: email,
@@ -42,6 +43,7 @@ class AuthService {
       uid: credential.user!.uid,
       email: email,
       displayName: displayName,
+      phone: phone,
     );
     return credential;
   }
