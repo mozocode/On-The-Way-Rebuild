@@ -232,7 +232,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                   radius: 50,
                                   backgroundColor: AppTheme.brandGreen.withOpacity(0.15),
                                   backgroundImage: _pickedImage != null
-                                      ? FileImage(_pickedImage!)
+                                      ? FileImage(_pickedImage!) as ImageProvider
                                       : (photoUrl != null ? NetworkImage(photoUrl) : null),
                                   child: (_pickedImage == null && photoUrl == null)
                                       ? Text(

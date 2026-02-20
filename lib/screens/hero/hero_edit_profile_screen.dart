@@ -215,7 +215,7 @@ class _HeroEditProfileScreenState extends ConsumerState<HeroEditProfileScreen> {
                           radius: 50,
                           backgroundColor: AppTheme.brandGreen.withOpacity(0.2),
                           backgroundImage: _pickedImage != null
-                              ? FileImage(_pickedImage!)
+                              ? FileImage(_pickedImage!) as ImageProvider
                               : (photoUrl != null ? NetworkImage(photoUrl) : null),
                           child: (_pickedImage == null && photoUrl == null)
                               ? Text(
