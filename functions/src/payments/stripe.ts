@@ -4,7 +4,13 @@ import { FieldValue } from "firebase-admin/firestore";
 
 const firestore = admin.firestore();
 
-const stripe = require("stripe")(functions.config().stripe.secret_key);
+let _stripe: any;
+function getStripe() {
+  if (!_stripe) {
+    _stripe = require("stripe")(functions.config().stripe?.secret_key || "sk_test_placeholder");
+  }
+  return _stripe;
+}
 
 export const createPaymentIntent = functions.https.onCall(
   async (data, context) => {
@@ -42,7 +48,7 @@ export const createPaymentIntent = functions.https.onCall(
         );
       }
 
-      const paymentIntent = await stripe.paymentIntents.create({
+      const paymentIntent = await getStripe().paymentIntents.create({
         amount: Math.round(amount * 100),
         currency,
         customer: job.customer?.stripeCustomerId || undefined,
@@ -85,7 +91,7 @@ export const capturePayment = functions.https.onCall(
     }
 
     try {
-      const captured = await stripe.paymentIntents.capture(paymentIntentId, {
+      const captured = await getStripe().paymentIntents.capture(paymentIntentId, {
         amount_to_capture: amountToCapture ? Math.round(amountToCapture * 100) : undefined,
       });
 

@@ -2,7 +2,13 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
-const stripe = require("stripe")(functions.config().stripe.secret_key);
+let _stripe: any;
+function getStripe() {
+  if (!_stripe) {
+    _stripe = require("stripe")(functions.config().stripe?.secret_key || "sk_test_placeholder");
+  }
+  return _stripe;
+}
 const firestore = admin.firestore();
 
 export const getOrCreateCustomer = functions.https.onCall(
@@ -27,7 +33,7 @@ export const getOrCreateCustomer = functions.https.onCall(
         return { customerId: existingCustomerId };
       }
 
-      const customer = await stripe.customers.create({
+      const customer = await getStripe().customers.create({
         email,
         name: name || undefined,
         phone: phone || undefined,
@@ -63,9 +69,9 @@ export const addPaymentMethod = functions.https.onCall(
     }
 
     try {
-      await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+      await getStripe().paymentMethods.attach(paymentMethodId, { customer: customerId });
       if (setAsDefault) {
-        await stripe.customers.update(customerId, {
+        await getStripe().customers.update(customerId, {
           invoice_settings: { default_payment_method: paymentMethodId },
         });
       }
