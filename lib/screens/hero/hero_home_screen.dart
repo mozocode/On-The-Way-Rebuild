@@ -509,13 +509,18 @@ class _IncomingJobCard extends StatelessWidget {
     this.onAccept,
   });
 
+  static const _dark = Color(0xFF1A1A2E);
+  static const _cardDark = Color(0xFF222236);
+  static const _dimText = Color(0xFF8E8E9E);
+  static const _accentBlue = Color(0xFF3B82F6);
+
   double? _distanceMiles() {
     if (heroLocation == null) return null;
     final lat1 = heroLocation!.latitude;
     final lon1 = heroLocation!.longitude;
     final lat2 = job.pickup.location.latitude;
     final lon2 = job.pickup.location.longitude;
-    const R = 3958.8; // Earth radius in miles
+    const R = 3958.8;
     final dLat = _toRad(lat2 - lat1);
     final dLon = _toRad(lon2 - lon1);
     final a = sin(dLat / 2) * sin(dLat / 2) +
@@ -525,26 +530,38 @@ class _IncomingJobCard extends StatelessWidget {
 
   static double _toRad(double deg) => deg * pi / 180;
 
+  int? _estimateMinutes(double? miles) {
+    if (miles == null) return null;
+    return (miles * 3).round().clamp(1, 999);
+  }
+
+  String _shortAddress(JobAddress? addr) {
+    if (addr == null) return 'Unknown';
+    if (addr.street != null && addr.city != null) {
+      return '${addr.street}, ${addr.city}';
+    }
+    return addr.formatted;
+  }
+
   @override
   Widget build(BuildContext context) {
     final service = ServiceTypes.getById(job.serviceType);
     final serviceName = service?.name ?? job.serviceType.replaceAll('_', ' ');
-    final distance = _distanceMiles();
-    final distanceText = distance != null
-        ? '${distance.toStringAsFixed(1)} mi away'
-        : 'Nearby';
+    final pickupDist = _distanceMiles();
+    final pickupEta = job.tracking.etaMinutes ?? _estimateMinutes(pickupDist);
     final payout = '\$${(job.pricing.total / 100).toStringAsFixed(2)}';
+    final hasDestination = job.destination != null;
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
+      margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: _dark,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
+            color: Colors.black.withOpacity(0.4),
+            blurRadius: 24,
+            offset: const Offset(0, -6),
           ),
         ],
       ),
@@ -552,109 +569,295 @@ class _IncomingJobCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
-            child: Text(
-              'Incoming Requests',
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: Colors.grey[900],
+          // Handle bar
+          Center(
+            child: Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
-          const Divider(height: 1),
+
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 12, 16),
+            padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
             child: Row(
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                // Service badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _cardDark,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Icon(_serviceIcon(job.serviceType), color: Colors.white, size: 14),
+                      const SizedBox(width: 6),
                       Text(
                         serviceName,
                         style: const TextStyle(
-                          fontSize: 16,
+                          color: Colors.white,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
-                      ),
-                      const SizedBox(height: 2),
-                      Row(
-                        children: [
-                          Text(
-                            distanceText,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            payout,
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppTheme.brandGreen,
-                            ),
-                          ),
-                        ],
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 8),
-                // Decline button
+                if (job.serviceSubType != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppTheme.brandGreen.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      job.serviceSubType!.replaceAll('_', ' '),
+                      style: TextStyle(
+                        color: AppTheme.brandGreen,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+                const Spacer(),
+                // Close/decline button
                 Material(
-                  color: Colors.red.withOpacity(0.08),
+                  color: Colors.transparent,
                   shape: const CircleBorder(),
                   child: InkWell(
                     customBorder: const CircleBorder(),
                     onTap: onDecline,
-                    child: const SizedBox(
-                      width: 44,
-                      height: 44,
-                      child: Icon(Icons.close, color: Colors.red, size: 22),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // Accept button
-                Material(
-                  color: AppTheme.brandGreen,
-                  borderRadius: BorderRadius.circular(22),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(22),
-                    onTap: onAccept,
                     child: Container(
-                      height: 44,
-                      padding: const EdgeInsets.symmetric(horizontal: 18),
-                      alignment: Alignment.center,
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.check, color: Colors.white, size: 18),
-                          SizedBox(width: 4),
-                          Text(
-                            'Accept',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        shape: BoxShape.circle,
                       ),
+                      child: const Icon(Icons.close, color: Colors.white54, size: 20),
                     ),
                   ),
                 ),
               ],
             ),
           ),
+
+          // Big price
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+            child: Text(
+              payout,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 36,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -1,
+              ),
+            ),
+          ),
+
+          // Customer rating row
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
+            child: Row(
+              children: [
+                const Icon(Icons.star, color: Colors.amber, size: 16),
+                const SizedBox(width: 4),
+                const Text(
+                  '5.0',
+                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(width: 10),
+                Icon(Icons.verified, color: _accentBlue, size: 15),
+                const SizedBox(width: 4),
+                Text(
+                  'Verified',
+                  style: TextStyle(color: _accentBlue, fontSize: 13, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Route details
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              children: [
+                // Pickup
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Column(
+                      children: [
+                        Container(
+                          width: 10,
+                          height: 10,
+                          decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        if (hasDestination)
+                          Container(
+                            width: 2,
+                            height: 30,
+                            color: Colors.white24,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            pickupEta != null && pickupDist != null
+                                ? '$pickupEta min (${pickupDist.toStringAsFixed(1)} mi)'
+                                : pickupDist != null
+                                    ? '${pickupDist.toStringAsFixed(1)} mi away'
+                                    : 'Nearby',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _shortAddress(job.pickup.address),
+                            style: const TextStyle(color: _dimText, fontSize: 13),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Destination
+                if (hasDestination) ...[
+                  const SizedBox(height: 4),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 10,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: Colors.transparent,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 2),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _shortAddress(job.destination!.address),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            Text(
+                              job.destination!.address?.city ?? '',
+                              style: const TextStyle(color: _dimText, fontSize: 13),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // Extra info row
+          if (job.pickup.notes != null && job.pickup.notes!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              child: Row(
+                children: [
+                  const Icon(Icons.info_outline, color: _dimText, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      job.pickup.notes!,
+                      style: const TextStyle(color: _dimText, fontSize: 12),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          const SizedBox(height: 18),
+
+          // Accept button
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+            child: SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: ElevatedButton(
+                onPressed: onAccept,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _accentBlue,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: const Text(
+                  'Accept',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  IconData _serviceIcon(String id) {
+    switch (id) {
+      case 'flat_tire':
+        return Icons.circle_outlined;
+      case 'dead_battery':
+        return Icons.battery_0_bar;
+      case 'lockout':
+        return Icons.key;
+      case 'fuel_delivery':
+        return Icons.local_gas_station;
+      case 'towing':
+        return Icons.local_shipping;
+      case 'transportation':
+        return Icons.directions_car;
+      default:
+        return Icons.build;
+    }
   }
 }
 
