@@ -247,3 +247,15 @@ final jobStreamProvider =
 final pendingJobsProvider = StreamProvider<List<JobModel>>((ref) {
   return FirestoreService().watchPendingJobs();
 });
+
+/// Streams the sum of heroPayout.totalPayout (in cents) for today's completed jobs.
+final heroDailyEarningsProvider =
+    StreamProvider.family<double, String>((ref, heroId) {
+  return FirestoreService().watchHeroCompletedJobsToday(heroId).map((jobs) {
+    int totalCents = 0;
+    for (final job in jobs) {
+      totalCents += job.pricing.heroPayout.totalPayout;
+    }
+    return totalCents / 100.0;
+  });
+});

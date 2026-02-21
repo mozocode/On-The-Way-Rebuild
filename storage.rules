@@ -1,0 +1,48 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isValidFile() {
+      return request.resource.size < 10 * 1024 * 1024
+          && request.resource.contentType.matches('image/.*|application/pdf');
+    }
+
+    // Hero application documents
+    match /hero_applications/{userId}/{applicationId}/{fileName} {
+      allow read: if isAuthenticated() && (isOwner(userId) || isAdmin());
+      allow write: if isAuthenticated() && isOwner(userId) && isValidFile();
+      allow delete: if isAuthenticated() && (isOwner(userId) || isAdmin());
+    }
+
+    // Profile photos
+    match /profile_photos/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isOwner(userId) && isValidFile();
+      allow delete: if isAuthenticated() && isOwner(userId);
+    }
+
+    // Job-related media (photos taken during service)
+    match /jobs/{jobId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && isValidFile();
+      allow delete: if false;
+    }
+
+    function isAdmin() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Deny everything else
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

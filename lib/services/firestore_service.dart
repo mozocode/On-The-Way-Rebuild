@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../config/firebase_config.dart';
 import '../models/user_model.dart';
@@ -131,15 +132,38 @@ class FirestoreService {
         });
   }
 
-  Stream<List<JobModel>> watchPendingJobs() {
+  Stream<List<JobModel>> watchPendingJobs({
+    double? heroLat,
+    double? heroLng,
+    double radiusMiles = 30,
+  }) {
     return _jobs
         .where('status', isEqualTo: 'searching')
         .orderBy('timestamps.createdAt', descending: true)
         .limit(50)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs.map((doc) => JobModel.fromFirestore(doc)).toList();
+          var jobs = snapshot.docs.map((doc) => JobModel.fromFirestore(doc)).toList();
+          if (heroLat != null && heroLng != null) {
+            jobs = jobs.where((job) {
+              final lat = job.pickup.location.latitude;
+              final lng = job.pickup.location.longitude;
+              if (lat == 0 && lng == 0) return true;
+              return _distanceMiles(heroLat, heroLng, lat, lng) <= radiusMiles;
+            }).toList();
+          }
+          return jobs;
         });
+  }
+
+  static double _distanceMiles(double lat1, double lng1, double lat2, double lng2) {
+    const r = 3958.8;
+    final dLat = (lat2 - lat1) * math.pi / 180;
+    final dLng = (lng2 - lng1) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(lat1 * math.pi / 180) * math.cos(lat2 * math.pi / 180) *
+        math.sin(dLng / 2) * math.sin(dLng / 2);
+    return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
   }
 
   String _getTimestampField(String status) {
@@ -161,13 +185,32 @@ class FirestoreService {
     }
   }
 
+  static const _validTransitions = <String, Set<String>>{
+    'searching': {'assigned', 'cancelled'},
+    'assigned': {'en_route', 'cancelled'},
+    'en_route': {'arrived', 'cancelled'},
+    'arrived': {'in_progress', 'cancelled'},
+    'in_progress': {'completed', 'cancelled'},
+  };
+
   Future<void> updateJobStatus(String jobId, String status) async {
-    await _jobs.doc(jobId).update({
-      'status': status,
-      'statusHistory': FieldValue.arrayUnion([
-        {'status': status, 'at': Timestamp.now()}
-      ]),
-      'timestamps.${_getTimestampField(status)}': FieldValue.serverTimestamp(),
+    await _db.runTransaction((transaction) async {
+      final jobDoc = await transaction.get(_jobs.doc(jobId));
+      if (!jobDoc.exists) throw Exception('Job not found');
+
+      final currentStatus = jobDoc.data()?['status'] as String?;
+      final allowed = _validTransitions[currentStatus];
+      if (allowed == null || !allowed.contains(status)) {
+        throw Exception('Invalid status transition: $currentStatus -> $status');
+      }
+
+      transaction.update(_jobs.doc(jobId), {
+        'status': status,
+        'statusHistory': FieldValue.arrayUnion([
+          {'status': status, 'at': Timestamp.now()}
+        ]),
+        'timestamps.${_getTimestampField(status)}': FieldValue.serverTimestamp(),
+      });
     });
   }
 
@@ -306,6 +349,26 @@ class FirestoreService {
         'pricing.tipAmountCents': tipAmountCents,
       });
     }
+  }
+
+  Stream<List<JobModel>> watchHeroCompletedJobsToday(String heroId) {
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final startOfTomorrow = startOfDay.add(const Duration(days: 1));
+
+    return _jobs
+        .where('hero.id', isEqualTo: heroId)
+        .where('status', isEqualTo: 'completed')
+        .where('timestamps.completedAt',
+            isGreaterThanOrEqualTo: Timestamp.fromDate(startOfDay))
+        .where('timestamps.completedAt',
+            isLessThan: Timestamp.fromDate(startOfTomorrow))
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => JobModel.fromFirestore(doc))
+              .toList();
+        });
   }
 
   Stream<JobModel?> watchLatestCompletedCustomerJob(String customerId) {

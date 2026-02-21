@@ -124,6 +124,9 @@ class HeroApplicationService {
 
   // ── Step 4: Documents ──
 
+  static const _maxFileSize = 10 * 1024 * 1024; // 10 MB
+  static const _allowedExtensions = {'jpg', 'jpeg', 'png', 'pdf', 'heic'};
+
   Future<UploadedDocument> uploadDocument(
     String applicationId,
     String userId,
@@ -131,7 +134,15 @@ class HeroApplicationService {
     File file, {
     String? expirationDate,
   }) async {
+    final fileSize = await file.length();
+    if (fileSize > _maxFileSize) {
+      throw Exception('File size exceeds 10 MB limit');
+    }
+
     final ext = file.path.split('.').last.toLowerCase();
+    if (!_allowedExtensions.contains(ext)) {
+      throw Exception('Invalid file type. Allowed: ${_allowedExtensions.join(', ')}');
+    }
     final fileName =
         '${type.name}_${DateTime.now().millisecondsSinceEpoch}.$ext';
     final storagePath =
@@ -209,8 +220,20 @@ class HeroApplicationService {
 
   Future<void> updateAgreements(
       String applicationId, Agreements agreements) async {
+    final serverNow = FieldValue.serverTimestamp();
     await _applications.doc(applicationId).update({
-      'agreements': agreements.toJson(),
+      'agreements.termsAccepted': agreements.termsAccepted,
+      'agreements.termsAcceptedAt': agreements.termsAccepted ? serverNow : null,
+      'agreements.privacyAccepted': agreements.privacyAccepted,
+      'agreements.privacyAcceptedAt': agreements.privacyAccepted ? serverNow : null,
+      'agreements.backgroundCheckConsent': agreements.backgroundCheckConsent,
+      'agreements.backgroundCheckConsentAt': agreements.backgroundCheckConsent ? serverNow : null,
+      'agreements.independentContractorAgreement': agreements.independentContractorAgreement,
+      'agreements.independentContractorAgreementAt': agreements.independentContractorAgreement ? serverNow : null,
+      'agreements.insuranceAcknowledgment': agreements.insuranceAcknowledgment,
+      'agreements.insuranceAcknowledgmentAt': agreements.insuranceAcknowledgment ? serverNow : null,
+      'agreements.safetyPolicyAccepted': agreements.safetyPolicyAccepted,
+      'agreements.safetyPolicyAcceptedAt': agreements.safetyPolicyAccepted ? serverNow : null,
       'completedSteps': FieldValue.arrayUnion([5]),
       'updatedAt': FieldValue.serverTimestamp(),
     });

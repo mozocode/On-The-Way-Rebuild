@@ -123,7 +123,9 @@ class _HeroHomeScreenState extends ConsumerState<HeroHomeScreen> {
                         isLoading: heroState.isLoading,
                       ),
                       const Spacer(),
-                      _DailyEarningsCard(amount: 0.00),
+                      _DailyEarningsCard(
+                        amount: ref.watch(heroDailyEarningsProvider(heroId)).valueOrNull ?? 0.00,
+                      ),
                       const Spacer(),
                       _MapOverlayButton(
                         icon: Icons.menu,

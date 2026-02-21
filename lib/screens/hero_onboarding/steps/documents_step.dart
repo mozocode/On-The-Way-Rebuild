@@ -243,6 +243,15 @@ class _DocCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  bool get _isImageUrl {
+    if (uploaded == null) return false;
+    final url = uploaded!.url.toLowerCase();
+    return url.contains('.jpg') ||
+        url.contains('.jpeg') ||
+        url.contains('.png') ||
+        url.contains('image%2f');
+  }
+
   @override
   Widget build(BuildContext context) {
     final done = uploaded != null;
@@ -252,19 +261,19 @@ class _DocCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         child: Row(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: done ? AppTheme.brandGreen.withAlpha(20) : Colors.grey[100],
+            if (done && _isImageUrl)
+              ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                done ? Icons.check_circle : req.icon,
-                color: done ? AppTheme.brandGreen : Colors.grey[500],
-                size: 24,
-              ),
-            ),
+                child: Image.network(
+                  uploaded!.url,
+                  width: 52,
+                  height: 52,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _buildIconBox(done),
+                ),
+              )
+            else
+              _buildIconBox(done),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -279,21 +288,54 @@ class _DocCard extends StatelessWidget {
                       Text(' *', style: TextStyle(color: Colors.red.shade400, fontSize: 14)),
                   ]),
                   const SizedBox(height: 2),
-                  Text(
-                    done ? 'Uploaded' : req.description,
-                    style: TextStyle(
-                      color: done ? AppTheme.brandGreen : Colors.grey[500],
-                      fontSize: 12,
+                  if (done)
+                    Row(
+                      children: [
+                        Icon(Icons.check_circle, color: AppTheme.brandGreen, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Uploaded successfully',
+                          style: TextStyle(
+                            color: AppTheme.brandGreen,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Text(
+                      req.description,
+                      style: TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
-                  ),
                 ],
               ),
             ),
             const SizedBox(width: 8),
             if (done)
-              IconButton(
-                icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 22),
-                onPressed: () => onDelete(uploaded!),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 36,
+                    child: OutlinedButton(
+                      onPressed: isUploading ? null : onUpload,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        textStyle: const TextStyle(fontSize: 12),
+                        side: BorderSide(color: Colors.grey.shade300),
+                      ),
+                      child: const Text('Replace'),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  IconButton(
+                    icon: Icon(Icons.delete_outline, color: Colors.red.shade400, size: 22),
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    padding: EdgeInsets.zero,
+                    onPressed: () => onDelete(uploaded!),
+                  ),
+                ],
               )
             else
               SizedBox(
@@ -313,6 +355,22 @@ class _DocCard extends StatelessWidget {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildIconBox(bool done) {
+    return Container(
+      width: 52,
+      height: 52,
+      decoration: BoxDecoration(
+        color: done ? AppTheme.brandGreen.withAlpha(20) : Colors.grey[100],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Icon(
+        done ? Icons.check_circle : req.icon,
+        color: done ? AppTheme.brandGreen : Colors.grey[500],
+        size: 24,
       ),
     );
   }

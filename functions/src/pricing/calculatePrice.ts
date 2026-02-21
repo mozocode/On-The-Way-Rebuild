@@ -361,7 +361,11 @@ export class PricingEngine {
 // ── Cloud Function: Full price calculation ──
 
 export const calculateJobPrice = functions.https.onCall(
-  async (data: PriceCalculationRequest) => {
+  async (data: PriceCalculationRequest, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+    }
+
     try {
       const config = await loadConfig();
       const engine = new PricingEngine(config);
@@ -376,7 +380,11 @@ export const calculateJobPrice = functions.https.onCall(
 // ── Cloud Function: Quick quote (simplified, no discounts/surge) ──
 
 export const getQuickQuote = functions.https.onCall(
-  async (data: { serviceType: string; estimatedMiles?: number }) => {
+  async (data: { serviceType: string; estimatedMiles?: number }, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+    }
+
     const config = await loadConfig();
     const service = config.services.find(
       (s) => s.id === data.serviceType && s.isActive

@@ -15,7 +15,7 @@
     "jobTracking": {
       "$jobId": {
         ".read": "auth != null",
-        ".write": "auth != null"
+        ".write": "auth != null && (root.child('jobs').child($jobId).child('hero').child('id').val() === auth.uid || root.child('jobs').child($jobId).child('customer').child('id').val() === auth.uid)"
       }
     },
     "typing": {

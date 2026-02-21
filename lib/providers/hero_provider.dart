@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/hero_model.dart';
 import '../models/job_model.dart';
@@ -114,6 +116,20 @@ class HeroNotifier extends StateNotifier<HeroState> {
   Future<void> goOnline() async {
     try {
       state = state.copyWith(isLoading: true);
+
+      final heroModel = await _firestore.getHero(heroId);
+      if (heroModel == null) {
+        state = state.copyWith(isLoading: false, error: 'Hero profile not found');
+        return;
+      }
+      if (!heroModel.status.isApproved || !heroModel.status.isVerified) {
+        state = state.copyWith(
+          isLoading: false,
+          error: 'Your account must be approved and verified before going online',
+        );
+        return;
+      }
+
       final hasPermission = await _locationService.requestPermissions();
       if (!hasPermission) {
         state = state.copyWith(
@@ -155,7 +171,18 @@ class HeroNotifier extends StateNotifier<HeroState> {
   Future<bool> acceptJob(String jobId) async {
     try {
       state = state.copyWith(isLoading: true);
-      final success = await _firestore.acceptJob(jobId, heroId);
+
+      bool success = false;
+      try {
+        final result = await FirebaseFunctions.instance
+            .httpsCallable('acceptJob')
+            .call({'jobId': jobId, 'heroId': heroId});
+        success = result.data['success'] == true;
+      } catch (e) {
+        debugPrint('Cloud Function acceptJob unavailable, using local: $e');
+        success = await _firestore.acceptJob(jobId, heroId);
+      }
+
       if (success) {
         await _locationService.startHeroTracking(
           heroId: heroId,

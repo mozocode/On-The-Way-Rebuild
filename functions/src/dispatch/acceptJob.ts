@@ -43,6 +43,13 @@ export const acceptJob = functions.https.onCall(async (data, context) => {
         );
       }
 
+      if (hero.status?.isApproved !== true || hero.status?.isVerified !== true) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Hero must be approved and verified to accept jobs"
+        );
+      }
+
       if (hero.status?.currentJobId) {
         throw new functions.https.HttpsError(
           "failed-precondition",

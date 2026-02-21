@@ -17,6 +17,15 @@ export const seedPricingConfig = functions.https.onCall(
       );
     }
 
+    const callerDoc = await firestore.collection("users").doc(context.auth.uid).get();
+    const callerRole = callerDoc.data()?.role;
+    if (callerRole !== "admin") {
+      throw new functions.https.HttpsError(
+        "permission-denied",
+        "Only admins can seed pricing config"
+      );
+    }
+
     const docRef = firestore.collection("pricingConfig").doc("default");
     const existing = await docRef.get();
 

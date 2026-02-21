@@ -17,6 +17,32 @@ export const sendPushNotification = functions.https.onCall(
       );
     }
 
+    const callerId = context.auth!.uid;
+    const callerDoc = await firestore.collection("users").doc(callerId).get();
+    const callerRole = callerDoc.data()?.role;
+    if (callerRole !== "admin") {
+      const [callerIsCustomer, callerIsHero] = await Promise.all([
+        firestore
+          .collection("jobs")
+          .where("customer.id", "==", callerId)
+          .where("hero.id", "==", userId)
+          .limit(1)
+          .get(),
+        firestore
+          .collection("jobs")
+          .where("hero.id", "==", callerId)
+          .where("customer.id", "==", userId)
+          .limit(1)
+          .get(),
+      ]);
+      if (callerIsCustomer.empty && callerIsHero.empty) {
+        throw new functions.https.HttpsError(
+          "permission-denied",
+          "Only admins or job participants can send notifications to this user"
+        );
+      }
+    }
+
     const userDoc = await firestore.collection("users").doc(userId).get();
     const token = userDoc.data()?.settings?.pushToken;
 

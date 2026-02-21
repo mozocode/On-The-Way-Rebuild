@@ -9,9 +9,24 @@ function getRealtimeDb() {
   return admin.database();
 }
 
+function verifyRadarWebhook(req: functions.https.Request): boolean {
+  const secret = functions.config().radar?.webhook_secret;
+  if (!secret) {
+    console.warn("radar.webhook_secret not configured — rejecting webhook");
+    return false;
+  }
+  const authHeader = req.headers["authorization"];
+  return authHeader === secret;
+}
+
 export const radarLocationUpdate = functions.https.onRequest(async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  if (!verifyRadarWebhook(req)) {
+    res.status(401).send("Unauthorized");
     return;
   }
 
@@ -85,6 +100,11 @@ export const radarLocationUpdate = functions.https.onRequest(async (req, res) =>
 export const radarGeofenceUpdate = functions.https.onRequest(async (req, res) => {
   if (req.method !== "POST") {
     res.status(405).send("Method Not Allowed");
+    return;
+  }
+
+  if (!verifyRadarWebhook(req)) {
+    res.status(401).send("Unauthorized");
     return;
   }
 
