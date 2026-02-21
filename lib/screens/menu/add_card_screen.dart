@@ -80,25 +80,37 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final scaffoldBg = isDark ? const Color(0xFF121212) : const Color(0xFFF5F5F5);
+    final cardBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final headerBg = isDark ? const Color(0xFF1E1E1E) : Colors.white;
+    final borderColor = isDark ? Colors.grey[500]! : Colors.grey[600]!;
+    final textColor = isDark ? Colors.white : Colors.black87;
+    final placeholderColor = isDark ? Colors.grey[400]! : Colors.grey[600]!;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
+      backgroundColor: scaffoldBg,
       body: SafeArea(
         child: Column(
           children: [
             Container(
-              color: Colors.white,
+              color: headerBg,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 children: [
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
-                    child: const Icon(Icons.arrow_back, size: 24),
+                    child: Icon(Icons.arrow_back, size: 24, color: textColor),
                   ),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       'Add Card',
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 24),
@@ -111,37 +123,47 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Card Details',
-                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: textColor,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     CardFormField(
                       controller: _controller,
                       style: CardFormStyle(
-                        borderColor: Colors.grey[300],
+                        borderColor: isDark ? const Color(0xFF555555) : const Color(0xFFBBBBBB),
+                        borderWidth: 2,
                         borderRadius: 12,
-                        backgroundColor: Colors.white,
-                        textColor: Colors.black,
-                        placeholderColor: Colors.grey[400],
+                        backgroundColor: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFE8E8E8),
+                        textColor: isDark ? Colors.white : const Color(0xFF111111),
+                        placeholderColor: isDark ? const Color(0xFF9E9E9E) : const Color(0xFF555555),
+                        fontSize: 18,
+                        cursorColor: const Color(0xFF4CAF50),
+                        textErrorColor: Colors.redAccent,
                       ),
                     ),
                     const SizedBox(height: 16),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.withOpacity(0.08),
+                        color: isDark
+                            ? Colors.blue.withOpacity(0.15)
+                            : Colors.blue.withOpacity(0.08),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.info_outline, color: Colors.blue[600], size: 18),
+                          Icon(Icons.info_outline, color: Colors.blue[400], size: 18),
                           const SizedBox(width: 8),
                           Text(
                             'Use test card: 4242 4242 4242 4242',
                             style: TextStyle(
                               fontSize: 13,
-                              color: Colors.blue[600],
+                              color: Colors.blue[400],
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -154,6 +176,14 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
                       height: 52,
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _addCard,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4CAF50),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
                         child: _isLoading
                             ? const SizedBox(
                                 width: 24,

@@ -5,7 +5,7 @@ import { FieldValue } from "firebase-admin/firestore";
 let _stripe: any;
 function getStripe() {
   if (!_stripe) {
-    _stripe = require("stripe")(functions.config().stripe?.secret_key || "sk_test_placeholder");
+    _stripe = require("stripe")(process.env.STRIPE_SECRET_KEY || functions.config().stripe?.secret_key || "sk_test_placeholder");
   }
   return _stripe;
 }

@@ -35,7 +35,7 @@ void main() async {
       await FirebaseCrashlytics.instance.setCrashlyticsCollectionEnabled(kReleaseMode);
     }
 
-    Stripe.publishableKey = 'pk_test_placeholder';
+    Stripe.publishableKey = 'pk_test_51RIW2nS8Lxsn5EMQtRTyEHivKJFEIcs5adFkMY69SCGAEqhUdWMmQRqAQHWhuVmG8i2LfmZQlnSEeAXYoqGnOsMF00arZnX9mD';
 
     ErrorWidget.builder = (FlutterErrorDetails details) {
       if (kReleaseMode) {
