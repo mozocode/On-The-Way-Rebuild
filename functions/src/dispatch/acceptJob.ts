@@ -12,6 +12,8 @@ export const acceptJob = functions.https.onCall(async (data, context) => {
   const { jobId } = data;
   const heroId = context.auth.uid;
 
+  console.log(`acceptJob called: jobId=${jobId}, heroId=${heroId}`);
+
   if (!jobId) {
     throw new functions.https.HttpsError("invalid-argument", "jobId is required");
   }
@@ -26,35 +28,56 @@ export const acceptJob = functions.https.onCall(async (data, context) => {
         transaction.get(heroRef),
       ]);
 
+      console.log(`Job exists: ${jobDoc.exists}, Hero exists: ${heroDoc.exists}`);
+
       if (!jobDoc.exists) {
         throw new functions.https.HttpsError("not-found", "Job not found");
       }
       if (!heroDoc.exists) {
-        throw new functions.https.HttpsError("not-found", "Hero profile not found");
+        throw new functions.https.HttpsError("not-found", `Hero profile not found for uid: ${heroId}`);
       }
 
       const job = jobDoc.data()!;
       const hero = heroDoc.data()!;
 
+      console.log(`Job status: ${job.status}, Hero status: ${JSON.stringify(hero.status)}`);
+
       if (job.status !== "searching") {
         throw new functions.https.HttpsError(
           "failed-precondition",
-          "Job is no longer available"
+          `Job is no longer available (status: ${job.status})`
         );
       }
 
-      if (hero.status?.isApproved !== true || hero.status?.isVerified !== true) {
+      const isApproved = hero.status?.isApproved === true;
+      const isVerified = hero.status?.isVerified === true;
+      if (!isApproved || !isVerified) {
         throw new functions.https.HttpsError(
           "failed-precondition",
-          "Hero must be approved and verified to accept jobs"
+          `Hero must be approved and verified (approved=${isApproved}, verified=${isVerified})`
         );
       }
 
-      if (hero.status?.currentJobId) {
-        throw new functions.https.HttpsError(
-          "failed-precondition",
-          "You already have an active job"
+      const existingJobId = hero.status?.currentJobId;
+      if (existingJobId) {
+        // Check if the existing job is actually active
+        const existingJobDoc = await transaction.get(
+          firestore.collection("jobs").doc(existingJobId)
         );
+        const existingStatus = existingJobDoc.data()?.status;
+        if (
+          existingJobDoc.exists &&
+          existingStatus !== "completed" &&
+          existingStatus !== "cancelled" &&
+          existingStatus !== "no_heroes_available"
+        ) {
+          throw new functions.https.HttpsError(
+            "failed-precondition",
+            "You already have an active job"
+          );
+        }
+        // Stale reference — clear it as part of this transaction
+        console.log(`Clearing stale currentJobId: ${existingJobId} (status: ${existingStatus})`);
       }
 
       const now = FieldValue.serverTimestamp();

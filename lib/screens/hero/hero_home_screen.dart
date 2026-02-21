@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -14,6 +15,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/hero_provider.dart';
 import '../../providers/job_provider.dart';
 import '../../models/job_model.dart';
+import '../../services/routing_service.dart';
 import 'hero_drawer.dart';
 import 'hero_map_web.dart' if (dart.library.io) 'hero_map_stub.dart' as hero_map;
 import 'hero_active_job_screen.dart';
@@ -446,22 +448,24 @@ class _IncomingJobBannerState extends ConsumerState<_IncomingJobBanner> {
           ),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to accept job. Please try again.'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        final heroState = ref.read(heroProvider(widget.heroId));
+        _showOverlayError(heroState.error ?? 'Failed to accept job. Please try again.');
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error accepting job: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      _showOverlayError('Error: $e');
     }
+  }
+
+  void _showOverlayError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.only(bottom: 400, left: 16, right: 16),
+      ),
+    );
   }
 
   @override
@@ -475,10 +479,7 @@ class _IncomingJobBannerState extends ConsumerState<_IncomingJobBanner> {
             jobs.where((j) => !_dismissedJobIds.contains(j.id)).toList();
         if (visible.isEmpty) return const SizedBox.shrink();
         final job = visible.first;
-        return Positioned(
-          left: 0,
-          right: 0,
-          bottom: 70,
+        return Positioned.fill(
           child: _IncomingJobCard(
             job: job,
             heroId: widget.heroId,
@@ -519,11 +520,20 @@ class _IncomingJobCard extends StatefulWidget {
 class _IncomingJobCardState extends State<_IncomingJobCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _timerController;
+  MapLibreMapController? _mapController;
+  List<LatLng>? _routePoints;
+  int? _routeEtaMinutes;
+  double? _routeDistanceMiles;
 
-  static const _dark = Color(0xFF1A1A2E);
-  static const _cardDark = Color(0xFF222236);
-  static const _dimText = Color(0xFF8E8E9E);
-  static const _accentBlue = Color(0xFF3B82F6);
+  static const _brandGreen = Color(0xFF4CAF50);
+  String? _acceptError;
+
+  String _mapStyleForBrightness(Brightness brightness) {
+    final style = brightness == Brightness.dark
+        ? 'radar-dark-v1'
+        : 'radar-default-v1';
+    return 'https://api.radar.io/maps/styles/$style?publishableKey=${RadarConfig.publishableKey}';
+  }
 
   @override
   void initState() {
@@ -538,15 +548,186 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
         widget.onDecline?.call();
       }
     });
+
+    HapticFeedback.heavyImpact();
+    _fetchRoute();
   }
 
   @override
   void dispose() {
+    _mapController?.dispose();
     _timerController.dispose();
     super.dispose();
   }
 
+  Future<void> _fetchRoute() async {
+    final heroLoc = widget.heroLocation;
+    if (heroLoc == null) return;
+    try {
+      final route = await RoutingService().getRoute(
+        origin: heroLoc,
+        destination: LocationModel(
+          latitude: widget.job.pickup.location.latitude,
+          longitude: widget.job.pickup.location.longitude,
+        ),
+      );
+      if (route != null && route.polyline.isNotEmpty && mounted) {
+        final decoded = _decodePolylineToMapLibre(route.polyline);
+        setState(() {
+          _routePoints = decoded;
+          _routeEtaMinutes = route.durationInMinutes;
+          _routeDistanceMiles = route.distanceInMiles;
+        });
+        _drawRouteOnMap();
+      }
+    } catch (e) {
+      debugPrint('Route fetch error: $e');
+    }
+  }
+
+  static List<LatLng> _decodePolylineToMapLibre(String encoded,
+      {int precision = 6}) {
+    if (encoded.isEmpty) return [];
+    final List<LatLng> points = [];
+    int index = 0;
+    int lat = 0;
+    int lng = 0;
+    int factor = 1;
+    for (int i = 0; i < precision; i++) {
+      factor *= 10;
+    }
+    while (index < encoded.length) {
+      int shift = 0;
+      int result = 0;
+      int byte;
+      do {
+        byte = encoded.codeUnitAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20);
+      lat += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      shift = 0;
+      result = 0;
+      do {
+        byte = encoded.codeUnitAt(index++) - 63;
+        result |= (byte & 0x1f) << shift;
+        shift += 5;
+      } while (byte >= 0x20);
+      lng += (result & 1) != 0 ? ~(result >> 1) : (result >> 1);
+      points.add(LatLng(lat / factor, lng / factor));
+    }
+    return points;
+  }
+
+  void _onMapCreated(MapLibreMapController controller) {
+    _mapController = controller;
+    _setupMap();
+  }
+
+  Future<void> _setupMap() async {
+    final c = _mapController;
+    if (c == null) return;
+
+    final heroLoc = widget.heroLocation;
+    final pickupLat = widget.job.pickup.location.latitude;
+    final pickupLng = widget.job.pickup.location.longitude;
+
+    if (heroLoc != null) {
+      final minLat = min(heroLoc.latitude, pickupLat);
+      final maxLat = max(heroLoc.latitude, pickupLat);
+      final minLng = min(heroLoc.longitude, pickupLng);
+      final maxLng = max(heroLoc.longitude, pickupLng);
+
+      final latPad = (maxLat - minLat) * 0.25;
+      final lngPad = (maxLng - minLng) * 0.25;
+
+      await c.moveCamera(CameraUpdate.newLatLngBounds(
+        LatLngBounds(
+          southwest: LatLng(minLat - latPad, minLng - lngPad),
+          northeast: LatLng(maxLat + latPad, maxLng + lngPad),
+        ),
+        left: 50,
+        top: 80,
+        right: 50,
+        bottom: 380,
+      ));
+
+      // Hero location marker
+      await c.addCircle(CircleOptions(
+        geometry: LatLng(heroLoc.latitude, heroLoc.longitude),
+        circleColor: '#4CAF50',
+        circleRadius: 10,
+        circleOpacity: 0.3,
+      ));
+      await c.addCircle(CircleOptions(
+        geometry: LatLng(heroLoc.latitude, heroLoc.longitude),
+        circleColor: '#4CAF50',
+        circleRadius: 6,
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 3,
+      ));
+
+      if (_routePoints == null) {
+        // Straight line fallback
+        await c.addLine(LineOptions(
+          geometry: [
+            LatLng(heroLoc.latitude, heroLoc.longitude),
+            LatLng(pickupLat, pickupLng),
+          ],
+          lineColor: '#4CAF50',
+          lineWidth: 4.0,
+          lineOpacity: 0.6,
+        ));
+      }
+    }
+
+    // Pickup marker
+    await c.addCircle(CircleOptions(
+      geometry: LatLng(pickupLat, pickupLng),
+      circleColor: '#FFFFFF',
+      circleRadius: 8,
+      circleStrokeColor: '#4CAF50',
+      circleStrokeWidth: 3,
+    ));
+
+    // Destination marker if exists
+    final dest = widget.job.destination;
+    if (dest != null) {
+      await c.addCircle(CircleOptions(
+        geometry: LatLng(dest.location.latitude, dest.location.longitude),
+        circleColor: '#FFFFFF',
+        circleRadius: 8,
+        circleStrokeColor: '#388E3C',
+        circleStrokeWidth: 3,
+      ));
+    }
+
+    _drawRouteOnMap();
+  }
+
+  Future<void> _drawRouteOnMap() async {
+    final c = _mapController;
+    final pts = _routePoints;
+    if (c == null || pts == null || pts.length < 2) return;
+
+    // Shadow line
+    await c.addLine(LineOptions(
+      geometry: pts,
+      lineColor: '#2E7D32',
+      lineWidth: 8.0,
+      lineOpacity: 0.5,
+    ));
+    // Main route line
+    await c.addLine(LineOptions(
+      geometry: pts,
+      lineColor: '#4CAF50',
+      lineWidth: 5.0,
+      lineOpacity: 0.9,
+    ));
+  }
+
   double? _distanceMiles() {
+    if (_routeDistanceMiles != null) return _routeDistanceMiles;
     if (widget.heroLocation == null) return null;
     final lat1 = widget.heroLocation!.latitude;
     final lon1 = widget.heroLocation!.longitude;
@@ -563,6 +744,7 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
   static double _toRad(double deg) => deg * pi / 180;
 
   int? _estimateMinutes(double? miles) {
+    if (_routeEtaMinutes != null) return _routeEtaMinutes;
     if (miles == null) return null;
     return (miles * 3).round().clamp(1, 999);
   }
@@ -577,24 +759,73 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
 
   @override
   Widget build(BuildContext context) {
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+    final cardBg = isDark ? const Color(0xFF1A1A2E) : Colors.white;
+
+    return Stack(
+      children: [
+        // Full-screen map matching app theme
+        if (kIsWeb)
+          Container(color: cardBg)
+        else
+          MapLibreMap(
+            styleString: _mapStyleForBrightness(brightness),
+            initialCameraPosition: CameraPosition(
+              target: LatLng(
+                widget.job.pickup.location.latitude,
+                widget.job.pickup.location.longitude,
+              ),
+              zoom: 13,
+            ),
+            onMapCreated: _onMapCreated,
+            myLocationEnabled: false,
+            tiltGesturesEnabled: false,
+            rotateGesturesEnabled: false,
+            compassEnabled: false,
+            attributionButtonMargins: const Point(-100, -100),
+          ),
+
+        // Bottom card
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _buildBottomCard(isDark: isDark),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomCard({required bool isDark}) {
     final job = widget.job;
     final service = ServiceTypes.getById(job.serviceType);
     final serviceName = service?.name ?? job.serviceType.replaceAll('_', ' ');
     final pickupDist = _distanceMiles();
-    final pickupEta = job.tracking.etaMinutes ?? _estimateMinutes(pickupDist);
+    final pickupEta = _routeEtaMinutes ?? job.tracking.etaMinutes ?? _estimateMinutes(pickupDist);
     final payout = '\$${(job.pricing.total / 100).toStringAsFixed(2)}';
     final hasDestination = job.destination != null;
 
+    final cardBg = isDark ? const Color(0xFF1A1A2E) : Colors.white;
+    final chipBg = isDark ? const Color(0xFF222236) : Colors.grey.shade100;
+    final chipBorder = isDark ? Colors.white12 : Colors.grey.shade300;
+    final primaryText = isDark ? Colors.white : Colors.black87;
+    final secondaryText = isDark ? const Color(0xFF8E8E9E) : Colors.grey.shade600;
+    final dismissBg = isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200;
+    final dismissIcon = isDark ? Colors.white54 : Colors.grey.shade600;
+    final dotColor = isDark ? Colors.white : Colors.black87;
+    final dividerColor = isDark ? Colors.white24 : Colors.grey.shade300;
+    final timerBg = isDark ? Colors.white10 : Colors.grey.shade200;
+
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        color: _dark,
+        color: cardBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.4),
-            blurRadius: 24,
-            offset: const Offset(0, -6),
+            color: Colors.black.withOpacity(isDark ? 0.6 : 0.15),
+            blurRadius: 30,
+            offset: const Offset(0, -8),
           ),
         ],
       ),
@@ -610,11 +841,9 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
               builder: (context, child) {
                 return LinearProgressIndicator(
                   value: 1 - _timerController.value,
-                  backgroundColor: Colors.white10,
+                  backgroundColor: timerBg,
                   valueColor: AlwaysStoppedAnimation(
-                    _timerController.value > 0.3
-                        ? _accentBlue
-                        : Colors.orange,
+                    _timerController.value > 0.3 ? _brandGreen : Colors.orange,
                   ),
                   minHeight: 5,
                 );
@@ -622,6 +851,7 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
             ),
           ),
 
+          // Service type badge row + dismiss
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
             child: Row(
@@ -629,19 +859,19 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: _cardDark,
+                    color: chipBg,
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.white12),
+                    border: Border.all(color: chipBorder),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(_serviceIcon(job.serviceType), color: Colors.white, size: 14),
+                      Icon(_serviceIcon(job.serviceType), color: primaryText, size: 14),
                       const SizedBox(width: 6),
                       Text(
                         serviceName,
-                        style: const TextStyle(
-                          color: Colors.white,
+                        style: TextStyle(
+                          color: primaryText,
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                         ),
@@ -678,10 +908,10 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.08),
+                        color: dismissBg,
                         shape: BoxShape.circle,
                       ),
-                      child: const Icon(Icons.close, color: Colors.white54, size: 20),
+                      child: Icon(Icons.close, color: dismissIcon, size: 20),
                     ),
                   ),
                 ),
@@ -689,12 +919,13 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
             ),
           ),
 
+          // Price
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
             child: Text(
               payout,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: primaryText,
                 fontSize: 36,
                 fontWeight: FontWeight.w800,
                 letterSpacing: -1,
@@ -702,36 +933,33 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
             ),
           ),
 
+          // Rating + Verified + timer
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
             child: Row(
               children: [
                 const Icon(Icons.star, color: Colors.amber, size: 16),
                 const SizedBox(width: 4),
-                const Text(
+                Text(
                   '5.0',
-                  style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: secondaryText, fontSize: 13, fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(width: 10),
-                Icon(Icons.verified, color: _accentBlue, size: 15),
+                Icon(Icons.verified, color: _brandGreen, size: 15),
                 const SizedBox(width: 4),
                 Text(
                   'Verified',
-                  style: TextStyle(color: _accentBlue, fontSize: 13, fontWeight: FontWeight.w500),
+                  style: TextStyle(color: _brandGreen, fontSize: 13, fontWeight: FontWeight.w500),
                 ),
                 const Spacer(),
                 AnimatedBuilder(
                   animation: _timerController,
                   builder: (context, child) {
-                    final remaining = (
-                      (1 - _timerController.value) * 20
-                    ).ceil();
+                    final remaining = ((1 - _timerController.value) * 20).ceil();
                     return Text(
                       '${remaining}s',
                       style: TextStyle(
-                        color: _timerController.value > 0.3
-                            ? Colors.white38
-                            : Colors.orange,
+                        color: _timerController.value > 0.3 ? secondaryText : Colors.orange,
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
@@ -744,6 +972,7 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
 
           const SizedBox(height: 16),
 
+          // Pickup + destination stops
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
@@ -756,17 +985,13 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
                         Container(
                           width: 10,
                           height: 10,
-                          decoration: const BoxDecoration(
-                            color: Colors.white,
+                          decoration: BoxDecoration(
+                            color: dotColor,
                             shape: BoxShape.circle,
                           ),
                         ),
                         if (hasDestination)
-                          Container(
-                            width: 2,
-                            height: 30,
-                            color: Colors.white24,
-                          ),
+                          Container(width: 2, height: 30, color: dividerColor),
                       ],
                     ),
                     const SizedBox(width: 14),
@@ -780,8 +1005,8 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
                                 : pickupDist != null
                                     ? '${pickupDist.toStringAsFixed(1)} mi away'
                                     : 'Nearby',
-                            style: const TextStyle(
-                              color: Colors.white,
+                            style: TextStyle(
+                              color: primaryText,
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                             ),
@@ -789,7 +1014,7 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
                           const SizedBox(height: 2),
                           Text(
                             _shortAddress(job.pickup.address),
-                            style: const TextStyle(color: _dimText, fontSize: 13),
+                            style: TextStyle(color: secondaryText, fontSize: 13),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -809,7 +1034,7 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
                         decoration: BoxDecoration(
                           color: Colors.transparent,
                           shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                          border: Border.all(color: dotColor, width: 2),
                         ),
                       ),
                       const SizedBox(width: 14),
@@ -819,15 +1044,15 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
                           children: [
                             Text(
                               _shortAddress(job.destination!.address),
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: primaryText,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
                             Text(
                               job.destination!.address?.city ?? '',
-                              style: const TextStyle(color: _dimText, fontSize: 13),
+                              style: TextStyle(color: secondaryText, fontSize: 13),
                             ),
                           ],
                         ),
@@ -839,17 +1064,32 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
             ),
           ),
 
-          if (job.pickup.notes != null && job.pickup.notes!.isNotEmpty)
+          if (hasDestination)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
               child: Row(
                 children: [
-                  const Icon(Icons.info_outline, color: _dimText, size: 16),
+                  Icon(Icons.alt_route, color: secondaryText, size: 16),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Multiple stops',
+                    style: TextStyle(color: secondaryText, fontSize: 13),
+                  ),
+                ],
+              ),
+            ),
+
+          if (job.pickup.notes != null && job.pickup.notes!.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: secondaryText, size: 16),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
                       job.pickup.notes!,
-                      style: const TextStyle(color: _dimText, fontSize: 12),
+                      style: TextStyle(color: secondaryText, fontSize: 12),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -860,26 +1100,30 @@ class _IncomingJobCardState extends State<_IncomingJobCard>
 
           const SizedBox(height: 18),
 
+          // Accept button
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-            child: SizedBox(
-              width: double.infinity,
-              height: 54,
-              child: ElevatedButton(
-                onPressed: widget.onAccept,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _accentBlue,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                width: double.infinity,
+                height: 54,
+                child: ElevatedButton(
+                  onPressed: widget.onAccept,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _brandGreen,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                child: const Text(
-                  'Accept',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
+                  child: const Text(
+                    'Accept',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),

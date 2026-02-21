@@ -135,6 +135,7 @@ async function findNearbyHeroes(
     .collection("heroes")
     .where("status.isOnline", "==", true)
     .where("status.isVerified", "==", true)
+    .where("status.isApproved", "==", true)
     .get();
 
   const minRadiusMeters = minRadiusMiles * 1609.34;
