@@ -203,6 +203,14 @@ class _VehicleInfoStepState extends ConsumerState<VehicleInfoStep>
             label: 'VIN (Optional)',
             hintText: '17-character VIN',
             textInputAction: TextInputAction.next,
+            validator: (v) {
+              if (v == null || v.isEmpty) return null;
+              if (v.length != 17) return 'VIN must be exactly 17 characters';
+              if (!RegExp(r'^[A-HJ-NPR-Z0-9]{17}$').hasMatch(v.toUpperCase())) {
+                return 'Invalid VIN format';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 16),
 
@@ -400,7 +408,7 @@ class _VehicleInfoStepState extends ConsumerState<VehicleInfoStep>
   };
 
   static const _usStates = [
-    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+    'AL','AK','AZ','AR','CA','CO','CT','DC','DE','FL','GA',
     'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
     'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
     'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',

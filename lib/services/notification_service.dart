@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -255,4 +257,7 @@ class NotificationService {
 }
 
 @pragma('vm:entry-point')
-Future<void> _handleBackgroundMessage(RemoteMessage message) async {}
+Future<void> _handleBackgroundMessage(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint('[Notification] Background message: ${message.messageId}');
+}

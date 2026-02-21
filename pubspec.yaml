@@ -19,6 +19,8 @@ dependencies:
   firebase_analytics: ^11.4.1
   cloud_functions: ^5.2.1
   firebase_storage: ^12.4.1
+  firebase_crashlytics: ^4.3.2
+  flutter_stripe: ^11.2.0
 
   # Radar.com - Flutter SDK (includes location/tracking; map via maplibre_gl + Radar styles)
   flutter_radar: ^3.9.0
@@ -36,8 +38,9 @@ dependencies:
   # Navigation
   go_router: ^13.0.1
 
-  # Auth - email/password only for now (Firebase Auth)
-  # sign_in_with_apple: ^5.0.0  # add later if needed
+  # Auth
+  google_sign_in: ^6.2.1
+  sign_in_with_apple: ^5.0.0
 
   # UI Components
   flutter_svg: ^2.0.9

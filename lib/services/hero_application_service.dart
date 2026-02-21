@@ -88,8 +88,14 @@ class HeroApplicationService {
 
   Future<void> updatePersonalInfo(
       String applicationId, PersonalInfo info) async {
+    final json = info.toJson();
+    // Mask SSN before persisting — the real value should only be sent to
+    // the background-check provider via the Cloud Function, not stored.
+    if (json['ssnLastFour'] != null) {
+      json['ssnLastFour'] = '****';
+    }
     await _applications.doc(applicationId).update({
-      'personalInfo': info.toJson(),
+      'personalInfo': json,
       'completedSteps': FieldValue.arrayUnion([1]),
       'currentStep': 2,
       'updatedAt': FieldValue.serverTimestamp(),

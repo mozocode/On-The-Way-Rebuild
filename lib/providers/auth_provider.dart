@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
@@ -65,14 +66,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     // If Firebase auth stream doesn't emit within 2s (e.g. simulator/network), show login so app isn't stuck on white splash
     Future.delayed(const Duration(seconds: 2), () {
       if (!state.isInitialized) {
-        print('[AUTH] init timeout: showing login');
+        debugPrint('[AUTH] init timeout: showing login');
         state = const AuthState(isInitialized: true);
       }
     });
 
     _authSub = _authService.authStateChanges.listen(
       (user) {
-        print('[AUTH] authStateChanges fired: user=${user?.uid ?? "null"}');
+        debugPrint('[AUTH] authStateChanges fired');
         if (user == null) {
           state = const AuthState(isInitialized: true);
           _userSub?.cancel();
@@ -82,7 +83,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         }
       },
       onError: (e) {
-        print('[AUTH] authStateChanges error: $e');
+        debugPrint('[AUTH] authStateChanges error: $e');
         state = const AuthState(isInitialized: true);
       },
     );
@@ -92,7 +93,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _userSub?.cancel();
     _userSub = _firestoreService.watchUser(uid).listen(
       (user) {
-        print('[AUTH] watchUser emitted: ${user?.email ?? "null"}');
+        debugPrint('[AUTH] watchUser emitted');
         state = state.copyWith(
           user: user,
           isLoading: false,
@@ -105,12 +106,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
               heroId: user.heroProfileId,
             );
           } catch (e) {
-            print('[AUTH] notification token error: $e');
+            debugPrint('[AUTH] notification token error: $e');
           }
         }
       },
       onError: (e) {
-        print('[AUTH] watchUser error: $e');
+        debugPrint('[AUTH] watchUser error: $e');
         state = state.copyWith(
           isLoading: false,
           isInitialized: true,
@@ -125,16 +126,16 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String password,
   }) async {
     try {
-      print('[AUTH] signInWithEmail called: $email');
+      debugPrint('[AUTH] signInWithEmail called');
       state = state.copyWith(isLoading: true, error: null);
       await _authService.signInWithEmail(email: email, password: password);
-      print('[AUTH] signInWithEmail succeeded');
+      debugPrint('[AUTH] signInWithEmail succeeded');
     } on FirebaseAuthException catch (e) {
-      print('[AUTH] signInWithEmail FirebaseAuthException: ${e.message}');
+      debugPrint('[AUTH] signInWithEmail FirebaseAuthException');
       state = state.copyWith(
           isLoading: false, error: e.message ?? 'Authentication failed');
     } catch (e) {
-      print('[AUTH] signInWithEmail error: $e');
+      debugPrint('[AUTH] signInWithEmail error');
       state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
@@ -156,6 +157,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
     } on FirebaseAuthException catch (e) {
       state = state.copyWith(
           isLoading: false, error: e.message ?? 'Authentication failed');
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> signInWithGoogle() async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      await _authService.signInWithGoogle();
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: e.toString());
+    }
+  }
+
+  Future<void> signInWithApple() async {
+    try {
+      state = state.copyWith(isLoading: true, error: null);
+      await _authService.signInWithApple();
     } catch (e) {
       state = state.copyWith(isLoading: false, error: e.toString());
     }

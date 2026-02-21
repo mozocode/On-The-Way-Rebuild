@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/job_model.dart';
@@ -119,10 +120,10 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
       state = state.copyWith(pricing: pricing, isPriceLoading: false);
     } catch (e) {
       debugPrint('[JobCreation] Cloud pricing failed, using local fallback: $e');
-      // Fallback to local calculation
+      final distanceMiles = _estimateDistanceMiles();
       final pricing = _paymentService.calculatePrice(
         serviceType: state.serviceType!,
-        distanceMiles: 5.0,
+        distanceMiles: distanceMiles,
         isPriority: state.isPriority,
         needsWinch: state.needsWinch,
       );
@@ -180,6 +181,22 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
       state = state.copyWith(isLoading: false, error: e.toString());
       return null;
     }
+  }
+
+  double _estimateDistanceMiles() {
+    final pickup = state.pickupLocation;
+    final dest = state.destinationLocation;
+    if (pickup == null || dest == null) return 5.0;
+    const r = 3958.8;
+    final dLat = (dest.latitude - pickup.latitude) * math.pi / 180;
+    final dLng = (dest.longitude - pickup.longitude) * math.pi / 180;
+    final a = math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(pickup.latitude * math.pi / 180) *
+            math.cos(dest.latitude * math.pi / 180) *
+            math.sin(dLng / 2) *
+            math.sin(dLng / 2);
+    final distance = r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a));
+    return distance > 0 ? distance : 5.0;
   }
 
   void reset() {

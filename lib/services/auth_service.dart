@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 import '../config/firebase_config.dart';
 import 'firestore_service.dart';
 
@@ -81,6 +83,51 @@ class AuthService {
       'updatedAt': FieldValue.serverTimestamp(),
       'lastLoginAt': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<UserCredential> signInWithGoogle() async {
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+    final googleUser = await googleSignIn.signIn();
+    if (googleUser == null) throw Exception('Google sign-in cancelled');
+
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+    final userCredential = await _auth.signInWithCredential(credential);
+    await _createOrUpdateUserFromSocial(
+      userCredential.user!,
+      displayName: googleUser.displayName,
+    );
+    return userCredential;
+  }
+
+  Future<UserCredential> signInWithApple() async {
+    final appleCredential = await SignInWithApple.getAppleIDCredential(
+      scopes: [
+        AppleIDAuthorizationScopes.email,
+        AppleIDAuthorizationScopes.fullName,
+      ],
+    );
+
+    final oauthCredential = OAuthProvider('apple.com').credential(
+      idToken: appleCredential.identityToken,
+      accessToken: appleCredential.authorizationCode,
+    );
+
+    final userCredential = await _auth.signInWithCredential(oauthCredential);
+
+    final displayName = [
+      appleCredential.givenName,
+      appleCredential.familyName,
+    ].where((s) => s != null && s.isNotEmpty).join(' ');
+
+    await _createOrUpdateUserFromSocial(
+      userCredential.user!,
+      displayName: displayName.isNotEmpty ? displayName : null,
+    );
+    return userCredential;
   }
 
   Future<void> _createOrUpdateUserFromSocial(User user,

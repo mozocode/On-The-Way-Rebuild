@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'config/theme.dart';
@@ -23,7 +24,7 @@ class OTWApp extends ConsumerWidget {
     final themeMode = ref.watch(themeModeProvider);
     final onboardingAsync = ref.watch(onboardingCompleteProvider);
 
-    print('[APP] build: isInitialized=${authState.isInitialized}, isAuthenticated=${authState.isAuthenticated}, isHero=${authState.isHero}, showHero=$showHeroDashboard');
+    debugPrint('[APP] build: isInitialized=${authState.isInitialized}, isAuthenticated=${authState.isAuthenticated}');
 
     Widget home;
     if (!authState.isInitialized) {

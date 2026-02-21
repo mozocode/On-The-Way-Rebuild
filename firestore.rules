@@ -15,6 +15,10 @@ service cloud.firestore {
           || resource.data.hero.id == request.auth.uid;
     }
 
+    // NOTE: All authenticated users can read user profiles (needed for heroes
+    // to see customer names, etc.). Firestore rules don't support field-level
+    // read restrictions. Consider splitting into public/private subcollections
+    // if sensitive fields are added to user documents.
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId);
@@ -41,13 +45,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
 
       match /messages/{messageId} {
-        allow read: if isAuthenticated();
-        allow create: if isAuthenticated();
+        allow read, create: if isAuthenticated() && (
+          get(/databases/$(database)/documents/jobs/$(jobId)).data.customer.id == request.auth.uid ||
+          get(/databases/$(database)/documents/jobs/$(jobId)).data.hero.id == request.auth.uid
+        );
       }
 
       match /reviews/{reviewId} {
         allow read: if isAuthenticated();
-        allow create, update: if isAuthenticated();
+        allow create, update: if isAuthenticated() && (
+          get(/databases/$(database)/documents/jobs/$(jobId)).data.customer.id == request.auth.uid ||
+          get(/databases/$(database)/documents/jobs/$(jobId)).data.hero.id == request.auth.uid
+        );
       }
     }
 

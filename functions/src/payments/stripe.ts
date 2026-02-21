@@ -4,10 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 
 const firestore = admin.firestore();
 
-// Placeholder for Stripe integration.
-// Replace `STRIPE_SECRET_KEY` with your actual key in Firebase config:
-//   firebase functions:config:set stripe.secret_key="sk_..."
-// Then: const stripe = require('stripe')(functions.config().stripe.secret_key);
+const stripe = require("stripe")(functions.config().stripe.secret_key);
 
 export const createPaymentIntent = functions.https.onCall(
   async (data, context) => {
@@ -45,25 +42,24 @@ export const createPaymentIntent = functions.https.onCall(
         );
       }
 
-      // TODO: Create actual Stripe PaymentIntent
-      // const paymentIntent = await stripe.paymentIntents.create({
-      //   amount,
-      //   currency,
-      //   metadata: { jobId, userId: context.auth.uid },
-      // });
-
-      const paymentIntentId = `pi_placeholder_${Date.now()}`;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100),
+        currency,
+        customer: job.customer?.stripeCustomerId || undefined,
+        metadata: { jobId, userId: context.auth!.uid },
+        capture_method: "automatic",
+      });
 
       await firestore.collection("jobs").doc(jobId).update({
-        "payment.paymentIntentId": paymentIntentId,
+        "payment.paymentIntentId": paymentIntent.id,
         "payment.status": "requires_payment_method",
         "payment.amount": amount,
         "payment.currency": currency,
       });
 
       return {
-        paymentIntentId,
-        // clientSecret: paymentIntent.client_secret,
+        paymentIntentId: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret,
         amount,
         currency,
       };
@@ -89,10 +85,9 @@ export const capturePayment = functions.https.onCall(
     }
 
     try {
-      // TODO: Capture actual Stripe PaymentIntent
-      // await stripe.paymentIntents.capture(paymentIntentId, {
-      //   amount_to_capture: amountToCapture,
-      // });
+      const captured = await stripe.paymentIntents.capture(paymentIntentId, {
+        amount_to_capture: amountToCapture ? Math.round(amountToCapture * 100) : undefined,
+      });
 
       const jobsSnap = await firestore
         .collection("jobs")

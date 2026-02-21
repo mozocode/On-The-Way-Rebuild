@@ -247,11 +247,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   _buildSocialButton(
                     label: 'Continue with Google',
                     icon: _buildGoogleIcon(),
+                    onTap: () => ref.read(authProvider.notifier).signInWithGoogle(),
                   ),
                   const SizedBox(height: 12),
                   _buildSocialButton(
                     label: 'Continue with Apple',
                     icon: const Icon(Icons.apple, color: Colors.white, size: 22),
+                    onTap: () => ref.read(authProvider.notifier).signInWithApple(),
                   ),
                   const SizedBox(height: 32),
 
@@ -341,14 +343,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
-  Widget _buildSocialButton({required String label, required Widget icon}) {
+  Widget _buildSocialButton({required String label, required Widget icon, required VoidCallback onTap}) {
     return GestureDetector(
-      onTap: () {
-        final provider = label.contains('Google') ? 'Google' : 'Apple';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$provider sign-in coming soon'), duration: const Duration(seconds: 2)),
-        );
-      },
+      onTap: onTap,
       child: Container(
         width: double.infinity,
         height: 56,

@@ -57,14 +57,22 @@ export const incrementPromoCodeUsage = functions.firestore
   .onCreate(async (snapshot) => {
     const promoCode = snapshot.data()?.discounts?.promoCode;
     if (!promoCode) return;
+    const ref = firestore.collection("pricingConfig").doc("default");
     try {
-      await firestore
-        .collection("pricingConfig")
-        .doc("default")
-        .update({
+      await firestore.runTransaction(async (txn) => {
+        const doc = await txn.get(ref);
+        if (!doc.exists) return;
+        const data = doc.data()!;
+        const promo = data?.discounts?.promoCodeDiscounts?.[promoCode];
+        if (!promo) return;
+        const currentUses = promo.currentUses || 0;
+        const maxUses = promo.maxUses || 0;
+        if (maxUses > 0 && currentUses >= maxUses) return;
+        txn.update(ref, {
           [`discounts.promoCodeDiscounts.${promoCode}.currentUses`]:
-            admin.firestore.FieldValue.increment(1),
+            currentUses + 1,
         });
+      });
     } catch (error) {
       console.error("incrementPromoCodeUsage error:", error);
     }

@@ -2,6 +2,7 @@ import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
+const stripe = require("stripe")(functions.config().stripe.secret_key);
 const firestore = admin.firestore();
 
 export const getOrCreateCustomer = functions.https.onCall(
@@ -26,9 +27,13 @@ export const getOrCreateCustomer = functions.https.onCall(
         return { customerId: existingCustomerId };
       }
 
-      // TODO: Create actual Stripe customer
-      // const customer = await stripe.customers.create({ email, name, phone });
-      const customerId = `cus_placeholder_${Date.now()}`;
+      const customer = await stripe.customers.create({
+        email,
+        name: name || undefined,
+        phone: phone || undefined,
+        metadata: { firebaseUid: userId },
+      });
+      const customerId = customer.id;
 
       await firestore.collection("users").doc(userId).update({
         stripeCustomerId: customerId,
@@ -58,13 +63,12 @@ export const addPaymentMethod = functions.https.onCall(
     }
 
     try {
-      // TODO: Attach payment method in Stripe
-      // await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
-      // if (setAsDefault) {
-      //   await stripe.customers.update(customerId, {
-      //     invoice_settings: { default_payment_method: paymentMethodId },
-      //   });
-      // }
+      await stripe.paymentMethods.attach(paymentMethodId, { customer: customerId });
+      if (setAsDefault) {
+        await stripe.customers.update(customerId, {
+          invoice_settings: { default_payment_method: paymentMethodId },
+        });
+      }
 
       return { success: true, paymentMethodId };
     } catch (error: any) {

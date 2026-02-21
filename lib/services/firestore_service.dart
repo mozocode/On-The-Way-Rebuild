@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import '../config/firebase_config.dart';
 import '../models/user_model.dart';
 import '../models/hero_model.dart';
@@ -211,6 +212,16 @@ class FirestoreService {
         ]),
         'timestamps.${_getTimestampField(status)}': FieldValue.serverTimestamp(),
       });
+
+      if (status == 'cancelled') {
+        final heroId = jobDoc.data()?['hero']?['id'] as String?;
+        if (heroId != null) {
+          transaction.update(_heroes.doc(heroId), {
+            'stats.cancellations': FieldValue.increment(1),
+            'stats.lastCancellationAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
     });
   }
 
@@ -284,7 +295,7 @@ class FirestoreService {
       });
       return true;
     } catch (e, st) {
-      print('acceptJob error: $e\n$st');
+      debugPrint('acceptJob error: $e');
       return false;
     }
   }

@@ -359,7 +359,7 @@ class _PersonalInfoStepState extends ConsumerState<PersonalInfoStep>
   }
 
   static const _usStates = [
-    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA',
+    'AL','AK','AZ','AR','CA','CO','CT','DC','DE','FL','GA',
     'HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
     'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
     'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',

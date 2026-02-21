@@ -153,7 +153,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
                     validator: (v) {
                       if (v == null || v.isEmpty) return 'Please enter a password';
-                      if (v.length < 6) return 'Password must be at least 6 characters';
+                      if (v.length < 8) return 'Password must be at least 8 characters';
+                      if (!v.contains(RegExp(r'[A-Z]'))) return 'Include at least one uppercase letter';
+                      if (!v.contains(RegExp(r'[a-z]'))) return 'Include at least one lowercase letter';
+                      if (!v.contains(RegExp(r'[0-9]'))) return 'Include at least one number';
                       return null;
                     },
                   ),
