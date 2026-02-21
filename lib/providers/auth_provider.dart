@@ -144,6 +144,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     required String email,
     required String password,
     String? displayName,
+    String? firstName,
+    String? lastName,
     String? phone,
   }) async {
     try {
@@ -152,6 +154,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: email,
         password: password,
         displayName: displayName,
+        firstName: firstName,
+        lastName: lastName,
         phone: phone,
       );
     } on FirebaseAuthException catch (e) {

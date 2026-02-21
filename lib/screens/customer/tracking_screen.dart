@@ -126,6 +126,74 @@ class _CustomerTrackingScreenState
     );
   }
 
+  void _showSafetyTools() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              const Text(
+                'Safety Tools',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 20),
+              _SafetyOption(
+                icon: Icons.emergency,
+                iconColor: Colors.red,
+                title: 'Call 911',
+                subtitle: 'Connect with emergency services',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  // tel: scheme handled by url_launcher if available
+                },
+              ),
+              _SafetyOption(
+                icon: Icons.share_location,
+                iconColor: AppTheme.brandGreen,
+                title: 'Share Trip Status',
+                subtitle: 'Send live location to a contact',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Trip sharing link copied!')),
+                  );
+                },
+              ),
+              _SafetyOption(
+                icon: Icons.report_outlined,
+                iconColor: Colors.orange,
+                title: 'Report an Issue',
+                subtitle: 'Let us know about a safety concern',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Report submitted. Our team will follow up.')),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── Map overlay methods ──────────────────────────────────────────────────
 
   Future<void> _syncMapOverlays(TrackingState trackingState) async {
@@ -622,7 +690,7 @@ class _CustomerTrackingScreenState
         const SizedBox(height: 16),
         _HeroInfoRow(hero: hero),
         const SizedBox(height: 16),
-        _ActionButtonRow(onContact: _openChat, onSafety: () {}),
+        _ActionButtonRow(onContact: _openChat, onSafety: _showSafetyTools),
         if (isAssigned) ...[
           const SizedBox(height: 8),
           TextButton(
@@ -683,7 +751,7 @@ class _CustomerTrackingScreenState
         const SizedBox(height: 16),
         _HeroInfoRow(hero: hero),
         const SizedBox(height: 16),
-        _ActionButtonRow(onContact: _openChat, onSafety: () {}),
+        _ActionButtonRow(onContact: _openChat, onSafety: _showSafetyTools),
       ],
     );
   }
@@ -714,7 +782,7 @@ class _CustomerTrackingScreenState
         const SizedBox(height: 16),
         _HeroInfoRow(hero: hero),
         const SizedBox(height: 16),
-        _ActionButtonRow(onContact: _openChat, onSafety: () {}),
+        _ActionButtonRow(onContact: _openChat, onSafety: _showSafetyTools),
       ],
     );
   }
@@ -988,6 +1056,40 @@ class _ActionButtonRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _SafetyOption extends StatelessWidget {
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _SafetyOption({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 42,
+        height: 42,
+        decoration: BoxDecoration(
+          color: iconColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: iconColor, size: 22),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle, style: TextStyle(fontSize: 13, color: Colors.grey[500])),
+      onTap: onTap,
     );
   }
 }

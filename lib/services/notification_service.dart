@@ -5,9 +5,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../app.dart';
 import '../config/firebase_config.dart';
 import '../config/theme.dart';
+import '../screens/customer/tracking_screen.dart';
 import '../screens/hero/notification_job_screen.dart';
 import '../screens/hero/job_request_overlay.dart';
 import 'firestore_service.dart';
@@ -51,6 +53,22 @@ class NotificationService {
     FirebaseMessaging.onMessageOpenedApp.listen((message) {
       _navigateFromPayload(message.data);
     });
+
+    _checkPendingNotification();
+  }
+
+  Future<void> _checkPendingNotification() async {
+    final prefs = await SharedPreferences.getInstance();
+    final pending = prefs.getString('pending_notification');
+    if (pending != null) {
+      await prefs.remove('pending_notification');
+      try {
+        final data = jsonDecode(pending) as Map<String, dynamic>;
+        // Delay slightly to ensure navigator is ready
+        await Future.delayed(const Duration(milliseconds: 500));
+        _navigateFromPayload(data);
+      } catch (_) {}
+    }
   }
 
   Future<void> _createNotificationChannel() async {
@@ -287,8 +305,14 @@ class NotificationService {
         _navigateToJobDetails(nav, jobId);
         break;
       case 'job_accepted':
+        nav.push(
+          MaterialPageRoute(
+            builder: (_) => CustomerTrackingScreen(jobId: jobId),
+          ),
+        );
         break;
       case 'no_heroes':
+        _showNoHeroesDialog(nav, jobId);
         break;
     }
   }
@@ -300,10 +324,54 @@ class NotificationService {
       ),
     );
   }
+
+  void _showNoHeroesDialog(NavigatorState nav, String jobId) {
+    showDialog(
+      context: nav.context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('No Heroes Available'),
+        content: const Text(
+          'We couldn\'t find a hero near you right now. '
+          'Please try again in a few minutes.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('OK'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              nav.push(
+                MaterialPageRoute(
+                  builder: (_) => CustomerTrackingScreen(jobId: jobId),
+                ),
+              );
+            },
+            child: Text('View Job', style: TextStyle(color: AppTheme.brandGreen)),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 @pragma('vm:entry-point')
 Future<void> _handleBackgroundMessage(RemoteMessage message) async {
   await Firebase.initializeApp();
   debugPrint('[Notification] Background message: ${message.messageId}');
+
+  final type = message.data['type'];
+  final jobId = message.data['jobId'];
+  if (type == null || jobId == null) return;
+
+  // Store pending action so the app navigates on next foreground launch.
+  // The `getInitialMessage` and `onMessageOpenedApp` handlers in
+  // initialize() will pick up the tap action; this block handles
+  // any data-only background processing (e.g. badge updates).
+  if (type == 'job_accepted' || type == 'no_heroes') {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('pending_notification', '{"type":"$type","jobId":"$jobId"}');
+  }
 }

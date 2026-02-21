@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../config/theme.dart';
 
 class InviteFriendsScreen extends StatelessWidget {
@@ -183,7 +184,10 @@ class InviteFriendsScreen extends StatelessWidget {
                       height: 52,
                       child: ElevatedButton.icon(
                         onPressed: () {
-                          // TODO: Share functionality
+                          Share.share(
+                            'Join me on On The Way! Use my referral code $_referralCode to get \$10 off your first service. Download the app: https://ontheway.app',
+                            subject: 'Join On The Way - Get \$10 Off!',
+                          );
                         },
                         icon: const Icon(Icons.share, size: 20),
                         label: const Text(

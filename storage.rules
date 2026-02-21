@@ -32,7 +32,10 @@ service firebase.storage {
     // Job-related media (photos taken during service)
     match /jobs/{jobId}/{fileName} {
       allow read: if isAuthenticated();
-      allow write: if isAuthenticated() && isValidFile();
+      allow write: if isAuthenticated() && isValidFile() && (
+        firestore.get(/databases/(default)/documents/jobs/$(jobId)).data.customer.id == request.auth.uid ||
+        firestore.get(/databases/(default)/documents/jobs/$(jobId)).data.hero.id == request.auth.uid
+      );
       allow delete: if false;
     }
 

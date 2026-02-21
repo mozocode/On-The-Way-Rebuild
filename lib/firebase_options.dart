@@ -67,7 +67,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '221559958002',
     projectId: 'on-the-way-rebuild',
     storageBucket: 'on-the-way-rebuild.firebasestorage.app',
-    iosBundleId: 'com.otw.otwApp',
+    iosBundleId: 'com.joshua.otwApp',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
@@ -76,7 +76,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '221559958002',
     projectId: 'on-the-way-rebuild',
     storageBucket: 'on-the-way-rebuild.firebasestorage.app',
-    iosBundleId: 'com.otw.otwApp',
+    iosBundleId: 'com.joshua.otwApp',
   );
 
 }

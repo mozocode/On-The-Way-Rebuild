@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../config/radar_config.dart';
@@ -31,7 +32,7 @@ class RoutingService {
       });
 
       if (response.statusCode != 200) {
-        print('[RoutingService] API error ${response.statusCode}: ${response.body}');
+        debugPrint('[RoutingService] API error ${response.statusCode}: ${response.body}');
         return null;
       }
 
@@ -63,7 +64,7 @@ class RoutingService {
         calculatedAt: DateTime.now(),
       );
     } catch (e) {
-      print('[RoutingService] getRoute error: $e');
+      debugPrint('[RoutingService] getRoute error: $e');
       return null;
     }
   }
@@ -169,7 +170,7 @@ class RoutingService {
         ],
       );
     } catch (e) {
-      print(
+      debugPrint(
           '[RoutingService] getDirections error: $e — falling back to Radar');
       return getRoute(origin: origin, destination: destination);
     }

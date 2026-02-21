@@ -1,3 +1,4 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../config/theme.dart';
@@ -7,6 +8,7 @@ import '../../widgets/common/step_progress_indicator.dart';
 import '../../widgets/pricing/price_breakdown_card.dart';
 import '../../widgets/pricing/promo_code_input.dart';
 import '../customer/tracking_screen.dart';
+import '../menu/payment_methods_screen.dart';
 
 class ConfirmRequestScreen extends ConsumerStatefulWidget {
   final String serviceType;
@@ -48,6 +50,10 @@ class ConfirmRequestScreen extends ConsumerStatefulWidget {
 
 class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
   bool _isSubmitting = false;
+  String? _cardBrand;
+  String? _cardLast4;
+  int? _cardExpMonth;
+  int? _cardExpYear;
 
   @override
   void initState() {
@@ -60,7 +66,32 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
         widget.address,
         notes: widget.notes.isNotEmpty ? widget.notes : null,
       );
+      if (widget.destinationLatitude != null && widget.destinationLongitude != null) {
+        notifier.setDestinationLocation(
+          LocationModel(latitude: widget.destinationLatitude!, longitude: widget.destinationLongitude!),
+          widget.destinationAddress ?? '',
+        );
+      }
     });
+    _loadDefaultCard();
+  }
+
+  Future<void> _loadDefaultCard() async {
+    try {
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('listPaymentMethods')
+          .call({});
+      final methods = result.data['paymentMethods'] as List?;
+      if (methods != null && methods.isNotEmpty && mounted) {
+        final card = methods.first;
+        setState(() {
+          _cardBrand = card['brand'] as String?;
+          _cardLast4 = card['last4'] as String?;
+          _cardExpMonth = card['expMonth'] as int?;
+          _cardExpYear = card['expYear'] as int?;
+        });
+      }
+    } catch (_) {}
   }
 
   bool get _isLateNight {
@@ -389,7 +420,15 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                         GestureDetector(
-                          onTap: () {},
+                          onTap: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const PaymentMethodsScreen(),
+                              ),
+                            );
+                            _loadDefaultCard();
+                          },
                           child: Text(
                             'Change',
                             style: TextStyle(
@@ -424,12 +463,16 @@ class _ConfirmRequestScreenState extends ConsumerState<ConfirmRequestScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  'Visa •••• 4242',
-                                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                                Text(
+                                  _cardLast4 != null
+                                      ? '${(_cardBrand ?? 'Card')[0].toUpperCase()}${(_cardBrand ?? 'card').substring(1)} •••• $_cardLast4'
+                                      : 'No card on file',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                                 ),
                                 Text(
-                                  'Expires 1/2027',
+                                  _cardLast4 != null
+                                      ? 'Expires $_cardExpMonth/$_cardExpYear'
+                                      : 'Tap Change to add one',
                                   style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                                 ),
                               ],

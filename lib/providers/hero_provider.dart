@@ -87,7 +87,7 @@ class HeroNotifier extends StateNotifier<HeroState> {
         }
       },
       onError: (e) {
-        print('Hero watch error: $e');
+        debugPrint('Hero watch error: $e');
         state = state.copyWith(isLoading: false, error: 'Failed to load hero profile');
       },
     );
@@ -100,7 +100,7 @@ class HeroNotifier extends StateNotifier<HeroState> {
         _locationService.setCurrentJob(job?.id);
       },
       onError: (e) {
-        print('Active job watch error: $e');
+        debugPrint('Active job watch error: $e');
       },
     );
 
@@ -109,7 +109,7 @@ class HeroNotifier extends StateNotifier<HeroState> {
         state = state.copyWith(currentLocation: location);
       },
       onError: (e) {
-        print('Location stream error: $e');
+        debugPrint('Location stream error: $e');
       },
     );
   }
@@ -173,16 +173,10 @@ class HeroNotifier extends StateNotifier<HeroState> {
     try {
       state = state.copyWith(isLoading: true);
 
-      bool success = false;
-      try {
-        final result = await FirebaseFunctions.instance
-            .httpsCallable('acceptJob')
-            .call({'jobId': jobId, 'heroId': heroId});
-        success = result.data['success'] == true;
-      } catch (e) {
-        debugPrint('Cloud Function acceptJob unavailable, using local: $e');
-        success = await _firestore.acceptJob(jobId, heroId);
-      }
+      final result = await FirebaseFunctions.instance
+          .httpsCallable('acceptJob')
+          .call({'jobId': jobId, 'heroId': heroId});
+      final success = result.data['success'] == true;
 
       if (success) {
         await _locationService.startHeroTracking(

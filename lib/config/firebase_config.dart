@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -34,7 +34,7 @@ class FirebaseConfig {
         realtimeDb.setPersistenceEnabled(true);
         realtimeDb.setPersistenceCacheSizeBytes(10000000);
       } catch (e) {
-        print('Realtime DB persistence setup failed: $e');
+        debugPrint('Realtime DB persistence setup failed: $e');
       }
     }
 
@@ -49,12 +49,10 @@ class FirebaseConfig {
         sound: true,
         provisional: false,
       );
-      // ignore: avoid_print
-      print('Notification permission: ${settings.authorizationStatus}');
+      debugPrint('Notification permission: ${settings.authorizationStatus}');
     } catch (e) {
       // Notifications may not be supported on macOS debug builds
-      // ignore: avoid_print
-      print('Notification permission request failed: $e');
+      debugPrint('Notification permission request failed: $e');
     }
   }
 

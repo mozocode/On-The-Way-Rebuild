@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'dart:ui';
 
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
@@ -53,7 +53,7 @@ class _HeroHomeScreenState extends ConsumerState<HeroHomeScreen> {
         c.animateCamera(CameraUpdate.newLatLngZoom(latLng, 15));
       }
     } catch (e) {
-      print('Could not get user location: $e');
+      debugPrint('Could not get user location: $e');
     }
   }
 

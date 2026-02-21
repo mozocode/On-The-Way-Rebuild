@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../models/location_model.dart';
@@ -78,7 +79,7 @@ class LocationService {
       );
       await _radarService.startTracking(preset);
     } catch (e) {
-      print('[LocationService] Radar tracking setup error: $e');
+      debugPrint('[LocationService] Radar tracking setup error: $e');
     }
 
     _positionSubscription?.cancel();

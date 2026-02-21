@@ -6,6 +6,7 @@ import '../models/location_model.dart';
 import '../services/firestore_service.dart';
 import '../services/payment_service.dart';
 import '../services/pricing_service.dart';
+import '../services/stripe_service.dart';
 import 'auth_provider.dart';
 
 class JobCreationState {
@@ -52,16 +53,19 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
   final FirestoreService _firestoreService;
   final PaymentService _paymentService;
   final PricingService _pricingService;
+  final StripeService _stripeService;
   final Ref _ref;
 
   JobCreationNotifier({
     required FirestoreService firestoreService,
     required PaymentService paymentService,
     required PricingService pricingService,
+    required StripeService stripeService,
     required Ref ref,
   })  : _firestoreService = firestoreService,
         _paymentService = paymentService,
         _pricingService = pricingService,
+        _stripeService = stripeService,
         _ref = ref,
         super(const JobCreationState());
 
@@ -175,6 +179,16 @@ class JobCreationNotifier extends StateNotifier<JobCreationState> {
         if (state.promoCode != null)
           'discounts': {'promoCode': state.promoCode},
       });
+
+      try {
+        final clientSecret = await _stripeService.createPaymentIntent(jobId);
+        await _stripeService.presentPaymentSheet(clientSecret);
+      } catch (e) {
+        try { await _firestoreService.updateJobStatus(jobId, 'cancelled'); } catch (_) {}
+        state = state.copyWith(isLoading: false, error: 'Payment failed. Please try again.');
+        return null;
+      }
+
       state = state.copyWith(isLoading: false);
       return jobId;
     } catch (e) {
@@ -246,6 +260,7 @@ final jobCreationProvider =
     firestoreService: FirestoreService(),
     paymentService: PaymentService(),
     pricingService: PricingService(),
+    stripeService: StripeService(),
     ref: ref,
   );
 });

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_radar/flutter_radar.dart';
 
 class RadarConfig {
@@ -35,7 +36,7 @@ class RadarConfig {
   static void _handleClientLocation(Map result) {}
 
   static void _handleError(Map result) {
-    print('Radar error: $result');
+    debugPrint('Radar error: $result');
   }
 
   static void _handleGeofenceEntered(dynamic event) {

@@ -42,7 +42,12 @@ class NotificationJobScreen extends ConsumerWidget {
                   }
                 }
               : null,
-          onDecline: () => Navigator.pop(context),
+          onDecline: () {
+            if (heroId != null) {
+              ref.read(heroProvider(heroId).notifier).declineJob(job.id);
+            }
+            Navigator.pop(context);
+          },
         );
       },
       loading: () => const Scaffold(

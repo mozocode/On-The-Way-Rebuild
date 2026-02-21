@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/location_model.dart';
 import '../models/job_model.dart';
@@ -71,14 +72,14 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
     _realtimeLocationSub = _realtimeDb.watchJobTracking(jobId).listen(
       _handleRealtimeUpdate,
       onError: (e) {
-        print('[TrackingProvider] Realtime stream error: $e');
+        debugPrint('[TrackingProvider] Realtime stream error: $e');
         state = state.copyWith(error: 'Location stream error');
       },
     );
     _firestoreJobSub = _firestore.watchJob(jobId).listen(
       _handleFirestoreUpdate,
       onError: (e) {
-        print('[TrackingProvider] Firestore stream error: $e');
+        debugPrint('[TrackingProvider] Firestore stream error: $e');
       },
     );
   }
@@ -113,7 +114,7 @@ class TrackingNotifier extends StateNotifier<TrackingState> {
         etaDistance: etaDistance ?? state.etaDistance,
       );
     } catch (e) {
-      print('[TrackingProvider] Error parsing realtime update: $e');
+      debugPrint('[TrackingProvider] Error parsing realtime update: $e');
     }
   }
 

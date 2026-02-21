@@ -47,6 +47,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
             email: _emailController.text.trim(),
             password: _passwordController.text,
             displayName: displayName.isNotEmpty ? displayName : null,
+            firstName: first.isNotEmpty ? first : null,
+            lastName: last.isNotEmpty ? last : null,
             phone: phone.isNotEmpty ? '+1$phone' : null,
           );
     }
@@ -382,9 +384,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   Widget _buildSocialButton(String label, String iconText) {
     return GestureDetector(
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('$label sign-in coming soon'), duration: const Duration(seconds: 2)),
-        );
+        if (label == 'Google') {
+          ref.read(authProvider.notifier).signInWithGoogle();
+        } else if (label == 'Apple') {
+          ref.read(authProvider.notifier).signInWithApple();
+        }
       },
       child: Container(
         height: 52,

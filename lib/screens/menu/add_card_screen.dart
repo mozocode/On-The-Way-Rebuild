@@ -33,8 +33,13 @@ class _AddCardScreenState extends ConsumerState<AddCardScreen> {
 
     try {
       final paymentMethod = await Stripe.instance.createPaymentMethod(
-        params: const PaymentMethodParams.card(
-          paymentMethodData: PaymentMethodData(),
+        params: PaymentMethodParams.card(
+          paymentMethodData: PaymentMethodData(
+            billingDetails: BillingDetails(
+              name: FirebaseAuth.instance.currentUser?.displayName,
+              email: FirebaseAuth.instance.currentUser?.email,
+            ),
+          ),
         ),
       );
 

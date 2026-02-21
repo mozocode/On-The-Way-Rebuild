@@ -54,6 +54,43 @@ export const getOrCreateCustomer = functions.https.onCall(
   }
 );
 
+export const listPaymentMethods = functions.https.onCall(
+  async (data, context) => {
+    if (!context.auth) {
+      throw new functions.https.HttpsError("unauthenticated", "Must be authenticated");
+    }
+
+    const userId = context.auth.uid;
+
+    try {
+      const userDoc = await firestore.collection("users").doc(userId).get();
+      const customerId = userDoc.data()?.stripeCustomerId;
+
+      if (!customerId) {
+        return { paymentMethods: [] };
+      }
+
+      const methods = await getStripe().paymentMethods.list({
+        customer: customerId,
+        type: "card",
+      });
+
+      const cards = methods.data.map((pm: any) => ({
+        id: pm.id,
+        brand: pm.card?.brand ?? "unknown",
+        last4: pm.card?.last4 ?? "0000",
+        expMonth: pm.card?.exp_month ?? 0,
+        expYear: pm.card?.exp_year ?? 0,
+      }));
+
+      return { paymentMethods: cards };
+    } catch (error: any) {
+      console.error("listPaymentMethods error:", error);
+      throw new functions.https.HttpsError("internal", error.message);
+    }
+  }
+);
+
 export const addPaymentMethod = functions.https.onCall(
   async (data, context) => {
     if (!context.auth) {

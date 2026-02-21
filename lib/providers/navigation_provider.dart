@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/route_model.dart';
 import '../models/location_model.dart';
@@ -179,7 +180,7 @@ class NavigationNotifier extends StateNotifier<NavigationState> {
     }
     final deviation = _distanceToRoute(location, state.routePolyline!);
     if (deviation > _rerouteThresholdMeters) {
-      print('[NAV] Off-route by ${deviation.round()}m — rerouting');
+      debugPrint('[NAV] Off-route by ${deviation.round()}m — rerouting');
       _fetchRoute();
     }
   }
@@ -464,7 +465,7 @@ class NavigationNotifier extends StateNotifier<NavigationState> {
       }
       return result;
     } catch (e) {
-      print('[NAV] polyline decode error: $e');
+      debugPrint('[NAV] polyline decode error: $e');
       return [];
     }
   }

@@ -32,6 +32,8 @@ class AuthService {
     required String email,
     required String password,
     String? displayName,
+    String? firstName,
+    String? lastName,
     String? phone,
   }) async {
     final credential = await _auth.createUserWithEmailAndPassword(
@@ -45,6 +47,8 @@ class AuthService {
       uid: credential.user!.uid,
       email: email,
       displayName: displayName,
+      firstName: firstName,
+      lastName: lastName,
       phone: phone,
     );
     return credential;
@@ -62,12 +66,16 @@ class AuthService {
     required String uid,
     required String email,
     String? displayName,
+    String? firstName,
+    String? lastName,
     String? phone,
     String? photoUrl,
   }) async {
     await FirebaseConfig.firestore.collection('users').doc(uid).set({
       'email': email,
       'displayName': displayName,
+      'firstName': firstName,
+      'lastName': lastName,
       'phone': phone,
       'photoUrl': photoUrl,
       'role': 'customer',
@@ -96,9 +104,20 @@ class AuthService {
       idToken: googleAuth.idToken,
     );
     final userCredential = await _auth.signInWithCredential(credential);
+
+    String? googleFirstName;
+    String? googleLastName;
+    if (googleUser.displayName != null && googleUser.displayName!.isNotEmpty) {
+      final parts = googleUser.displayName!.split(' ');
+      googleFirstName = parts.first;
+      googleLastName = parts.length > 1 ? parts.sublist(1).join(' ') : null;
+    }
+
     await _createOrUpdateUserFromSocial(
       userCredential.user!,
       displayName: googleUser.displayName,
+      firstName: googleFirstName,
+      lastName: googleLastName,
     );
     return userCredential;
   }
@@ -126,12 +145,14 @@ class AuthService {
     await _createOrUpdateUserFromSocial(
       userCredential.user!,
       displayName: displayName.isNotEmpty ? displayName : null,
+      firstName: appleCredential.givenName,
+      lastName: appleCredential.familyName,
     );
     return userCredential;
   }
 
   Future<void> _createOrUpdateUserFromSocial(User user,
-      {String? displayName}) async {
+      {String? displayName, String? firstName, String? lastName}) async {
     final doc = await FirebaseConfig.firestore
         .collection('users')
         .doc(user.uid)
@@ -141,6 +162,8 @@ class AuthService {
         uid: user.uid,
         email: user.email ?? '',
         displayName: displayName ?? user.displayName,
+        firstName: firstName,
+        lastName: lastName,
         phone: user.phoneNumber,
         photoUrl: user.photoURL,
       );
