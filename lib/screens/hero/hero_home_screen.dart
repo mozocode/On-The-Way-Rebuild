@@ -483,7 +483,10 @@ class _IncomingJobBannerState extends ConsumerState<_IncomingJobBanner> {
             job: job,
             heroId: widget.heroId,
             heroLocation: loc,
-            onDecline: () => setState(() => _dismissedJobIds.add(job.id)),
+            onDecline: () {
+              setState(() => _dismissedJobIds.add(job.id));
+              ref.read(heroProvider(widget.heroId).notifier).declineJob(job.id);
+            },
             onAccept: () => _acceptAndNavigate(job),
           ),
         );
@@ -494,7 +497,7 @@ class _IncomingJobBannerState extends ConsumerState<_IncomingJobBanner> {
   }
 }
 
-class _IncomingJobCard extends StatelessWidget {
+class _IncomingJobCard extends StatefulWidget {
   final JobModel job;
   final String heroId;
   final LocationModel? heroLocation;
@@ -509,17 +512,46 @@ class _IncomingJobCard extends StatelessWidget {
     this.onAccept,
   });
 
+  @override
+  State<_IncomingJobCard> createState() => _IncomingJobCardState();
+}
+
+class _IncomingJobCardState extends State<_IncomingJobCard>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _timerController;
+
   static const _dark = Color(0xFF1A1A2E);
   static const _cardDark = Color(0xFF222236);
   static const _dimText = Color(0xFF8E8E9E);
   static const _accentBlue = Color(0xFF3B82F6);
 
+  @override
+  void initState() {
+    super.initState();
+    _timerController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 20),
+    )..forward();
+
+    _timerController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        widget.onDecline?.call();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _timerController.dispose();
+    super.dispose();
+  }
+
   double? _distanceMiles() {
-    if (heroLocation == null) return null;
-    final lat1 = heroLocation!.latitude;
-    final lon1 = heroLocation!.longitude;
-    final lat2 = job.pickup.location.latitude;
-    final lon2 = job.pickup.location.longitude;
+    if (widget.heroLocation == null) return null;
+    final lat1 = widget.heroLocation!.latitude;
+    final lon1 = widget.heroLocation!.longitude;
+    final lat2 = widget.job.pickup.location.latitude;
+    final lon2 = widget.job.pickup.location.longitude;
     const R = 3958.8;
     final dLat = _toRad(lat2 - lat1);
     final dLon = _toRad(lon2 - lon1);
@@ -545,6 +577,7 @@ class _IncomingJobCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final job = widget.job;
     final service = ServiceTypes.getById(job.serviceType);
     final serviceName = service?.name ?? job.serviceType.replaceAll('_', ' ');
     final pickupDist = _distanceMiles();
@@ -569,24 +602,30 @@ class _IncomingJobCard extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Handle bar
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 6),
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white24,
-                borderRadius: BorderRadius.circular(2),
-              ),
+          // Countdown timer bar
+          ClipRRect(
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            child: AnimatedBuilder(
+              animation: _timerController,
+              builder: (context, child) {
+                return LinearProgressIndicator(
+                  value: 1 - _timerController.value,
+                  backgroundColor: Colors.white10,
+                  valueColor: AlwaysStoppedAnimation(
+                    _timerController.value > 0.3
+                        ? _accentBlue
+                        : Colors.orange,
+                  ),
+                  minHeight: 5,
+                );
+              },
             ),
           ),
 
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 12, 0),
+            padding: const EdgeInsets.fromLTRB(20, 10, 12, 0),
             child: Row(
               children: [
-                // Service badge
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
@@ -629,13 +668,12 @@ class _IncomingJobCard extends StatelessWidget {
                   ),
                 ],
                 const Spacer(),
-                // Close/decline button
                 Material(
                   color: Colors.transparent,
                   shape: const CircleBorder(),
                   child: InkWell(
                     customBorder: const CircleBorder(),
-                    onTap: onDecline,
+                    onTap: widget.onDecline,
                     child: Container(
                       width: 36,
                       height: 36,
@@ -651,7 +689,6 @@ class _IncomingJobCard extends StatelessWidget {
             ),
           ),
 
-          // Big price
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
             child: Text(
@@ -665,7 +702,6 @@ class _IncomingJobCard extends StatelessWidget {
             ),
           ),
 
-          // Customer rating row
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
             child: Row(
@@ -683,18 +719,35 @@ class _IncomingJobCard extends StatelessWidget {
                   'Verified',
                   style: TextStyle(color: _accentBlue, fontSize: 13, fontWeight: FontWeight.w500),
                 ),
+                const Spacer(),
+                AnimatedBuilder(
+                  animation: _timerController,
+                  builder: (context, child) {
+                    final remaining = (
+                      (1 - _timerController.value) * 20
+                    ).ceil();
+                    return Text(
+                      '${remaining}s',
+                      style: TextStyle(
+                        color: _timerController.value > 0.3
+                            ? Colors.white38
+                            : Colors.orange,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
 
           const SizedBox(height: 16),
 
-          // Route details
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Column(
               children: [
-                // Pickup
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -745,8 +798,6 @@ class _IncomingJobCard extends StatelessWidget {
                     ),
                   ],
                 ),
-
-                // Destination
                 if (hasDestination) ...[
                   const SizedBox(height: 4),
                   Row(
@@ -788,7 +839,6 @@ class _IncomingJobCard extends StatelessWidget {
             ),
           ),
 
-          // Extra info row
           if (job.pickup.notes != null && job.pickup.notes!.isNotEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
@@ -810,14 +860,13 @@ class _IncomingJobCard extends StatelessWidget {
 
           const SizedBox(height: 18),
 
-          // Accept button
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: SizedBox(
               width: double.infinity,
               height: 54,
               child: ElevatedButton(
-                onPressed: onAccept,
+                onPressed: widget.onAccept,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _accentBlue,
                   foregroundColor: Colors.white,

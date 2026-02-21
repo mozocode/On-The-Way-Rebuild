@@ -9,6 +9,7 @@ import '../app.dart';
 import '../config/firebase_config.dart';
 import '../config/theme.dart';
 import '../screens/hero/notification_job_screen.dart';
+import '../screens/hero/job_request_overlay.dart';
 import 'firestore_service.dart';
 
 class NotificationService {
@@ -110,7 +111,8 @@ class NotificationService {
     final ctx = nav?.context;
 
     if (ctx != null && message.data['type'] == 'new_job') {
-      _showInAppBanner(ctx, notification.title, notification.body, message.data);
+      _showJobRequestOverlay(ctx, message.data);
+      return;
     } else {
       _localNotifications.show(
         notification.hashCode,
@@ -218,6 +220,50 @@ class NotificationService {
     Future.delayed(const Duration(seconds: 8), () {
       if (entry.mounted) entry.remove();
     });
+  }
+
+  void _showJobRequestOverlay(
+    BuildContext context,
+    Map<String, dynamic> data,
+  ) {
+    final jobId = data['jobId'] as String?;
+    if (jobId == null) return;
+
+    final nav = OTWApp.navigatorKey.currentState;
+    if (nav == null) return;
+
+    final expiresAtStr = data['expiresAt'] as String?;
+    DateTime? expiresAt;
+    if (expiresAtStr != null) {
+      expiresAt = DateTime.tryParse(expiresAtStr);
+    }
+
+    nav.push(
+      PageRouteBuilder(
+        opaque: false,
+        pageBuilder: (ctx, animation, secondaryAnimation) => JobRequestOverlay(
+          jobId: jobId,
+          serviceType: data['serviceType'] as String?,
+          pickupAddress: data['pickupAddress'] as String?,
+          estimatedPrice: double.tryParse(data['estimatedPrice'] ?? ''),
+          distanceMiles: double.tryParse(data['distanceMiles'] ?? ''),
+          estimatedMinutes: int.tryParse(data['estimatedMinutes'] ?? ''),
+          expiresAt: expiresAt,
+        ),
+        transitionsBuilder: (ctx, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 1),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            )),
+            child: child,
+          );
+        },
+      ),
+    );
   }
 
   void _handleNotificationTap(NotificationResponse response) {

@@ -4,6 +4,7 @@ admin.initializeApp();
 
 export { dispatchJob } from "./dispatch/dispatchJob";
 export { acceptJob } from "./dispatch/acceptJob";
+export { declineJob } from "./dispatch/declineJob";
 export { radarLocationUpdate, radarGeofenceUpdate } from "./radar/webhooks";
 export { sendPushNotification, sendJobNotification } from "./notifications/push";
 export { createPaymentIntent, capturePayment } from "./payments/stripe";

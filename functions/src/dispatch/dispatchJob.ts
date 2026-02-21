@@ -10,7 +10,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 export const dispatchJob = functions
-  .runWith({ timeoutSeconds: 120 })
+  .runWith({ timeoutSeconds: 540 })
   .firestore.document("jobs/{jobId}")
   .onCreate(async (snapshot, context) => {
     const jobId = context.params.jobId;
@@ -20,6 +20,8 @@ export const dispatchJob = functions
     await snapshot.ref.update({
       status: "searching",
       "dispatch.startedAt": FieldValue.serverTimestamp(),
+      "dispatch.currentWave": 0,
+      "dispatch.notifiedHeroes": [],
     });
 
     await firestore.collection("dispatchWaves").doc(jobId).set({
@@ -28,6 +30,7 @@ export const dispatchJob = functions
       totalWaves: DISPATCH_WAVES.length,
       startedAt: FieldValue.serverTimestamp(),
       notifiedHeroes: [] as string[],
+      declinedHeroes: [] as string[],
       status: "in_progress",
     });
 
@@ -37,17 +40,22 @@ export const dispatchJob = functions
       const wave = DISPATCH_WAVES[waveIndex];
 
       const currentJob = await snapshot.ref.get();
-      if (currentJob.data()?.status === "assigned") {
+      const currentData = currentJob.data();
+      if (currentData?.status === "assigned") {
         console.log(`Job ${jobId} accepted, stopping dispatch`);
         break;
       }
 
-      console.log(`Wave ${waveIndex + 1}: radius ${wave.radius} miles`);
+      const declinedHeroes: string[] = currentData?.dispatch?.declinedHeroes ?? [];
+      const excludeHeroIds = [...new Set([...notifiedHeroes, ...declinedHeroes])];
+
+      console.log(`Wave ${waveIndex + 1}: ${wave.minRadiusMiles}-${wave.maxRadiusMiles} miles, timeout ${wave.timeoutSeconds}s`);
 
       await firestore.collection("dispatchWaves").doc(jobId).update({
         currentWave: waveIndex + 1,
         [`waves.${waveIndex}`]: {
-          radius: wave.radius,
+          minRadius: wave.minRadiusMiles,
+          maxRadius: wave.maxRadiusMiles,
           startedAt: FieldValue.serverTimestamp(),
         },
       });
@@ -55,24 +63,32 @@ export const dispatchJob = functions
       const heroes = await findNearbyHeroes(
         job.pickup?.location?.latitude ?? 0,
         job.pickup?.location?.longitude ?? 0,
-        wave.radius,
-        job.service?.type ?? ""
+        wave.minRadiusMiles,
+        wave.maxRadiusMiles,
+        job.service?.type ?? "",
+        excludeHeroIds,
+        wave.maxHeroesPerWave
       );
 
       const newHeroes = heroes.filter((h) => !notifiedHeroes.includes(h.id));
       console.log(`Found ${newHeroes.length} new heroes in wave ${waveIndex + 1}`);
 
       for (const hero of newHeroes) {
-        await notifyHero(jobId, job, hero);
+        await notifyHero(jobId, job, hero, waveIndex + 1);
         notifiedHeroes.push(hero.id);
       }
+
+      await snapshot.ref.update({
+        "dispatch.currentWave": waveIndex + 1,
+        "dispatch.notifiedHeroes": notifiedHeroes,
+      });
 
       await firestore.collection("dispatchWaves").doc(jobId).update({
         notifiedHeroes,
         [`waves.${waveIndex}.notifiedCount`]: newHeroes.length,
       });
 
-      await sleep(wave.durationMs);
+      await sleep(wave.timeoutSeconds * 1000);
     }
 
     const finalJob = await snapshot.ref.get();
@@ -92,35 +108,70 @@ export const dispatchJob = functions
     }
   });
 
+function calculateHeroScore(
+  distance: number,
+  maxRadius: number,
+  rating: number,
+  acceptanceRate: number,
+  responseTime: number
+): number {
+  const proximityScore = Math.max(0, 1 - distance / (maxRadius * 1609.34));
+  const ratingScore = ((rating || 5) - 1) / 4;
+  const acceptScore = acceptanceRate || 0.5;
+  const responseScore = Math.max(0, 1 - (responseTime || 30) / 60);
+  return proximityScore * 0.4 + ratingScore * 0.25 + acceptScore * 0.2 + responseScore * 0.15;
+}
+
 async function findNearbyHeroes(
   latitude: number,
   longitude: number,
-  radiusMiles: number,
-  _serviceType: string
-): Promise<Array<{ id: string; pushToken?: string }>> {
+  minRadiusMiles: number,
+  maxRadiusMiles: number,
+  serviceType: string,
+  excludeHeroIds: string[],
+  maxResults: number
+): Promise<Array<{ id: string; pushToken?: string; distance: number; rating: number; acceptanceRate: number; responseTime: number }>> {
   const heroesSnap = await firestore
     .collection("heroes")
     .where("status.isOnline", "==", true)
     .where("status.isVerified", "==", true)
     .get();
 
-  const radiusMeters = radiusMiles * 1609.34;
-  const results: Array<{ id: string; pushToken?: string }> = [];
+  const minRadiusMeters = minRadiusMiles * 1609.34;
+  const maxRadiusMeters = maxRadiusMiles * 1609.34;
+  const results: Array<{ id: string; pushToken?: string; distance: number; rating: number; acceptanceRate: number; responseTime: number; score: number }> = [];
 
   for (const doc of heroesSnap.docs) {
     const data = doc.data();
     if (data.status?.currentJobId) continue;
+    if (excludeHeroIds.includes(doc.id)) continue;
 
     const loc = data.location?.lastKnownLocation;
     if (!loc) continue;
 
     const dist = haversine(latitude, longitude, loc.latitude, loc.longitude);
-    if (dist <= radiusMeters) {
-      results.push({ id: doc.id, pushToken: data.settings?.pushToken });
-    }
+    if (dist < minRadiusMeters || dist > maxRadiusMeters) continue;
+
+    if (serviceType && data.serviceTypes && !data.serviceTypes.includes(serviceType)) continue;
+
+    const rating = data.stats?.rating ?? 5;
+    const acceptanceRate = data.stats?.acceptanceRate ?? 0.5;
+    const responseTime = data.stats?.avgResponseTime ?? 30;
+    const score = calculateHeroScore(dist, maxRadiusMiles, rating, acceptanceRate, responseTime);
+
+    results.push({
+      id: doc.id,
+      pushToken: data.settings?.pushToken,
+      distance: dist,
+      rating,
+      acceptanceRate,
+      responseTime,
+      score,
+    });
   }
 
-  return results;
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, maxResults);
 }
 
 function haversine(
@@ -142,7 +193,8 @@ function haversine(
 async function notifyHero(
   jobId: string,
   job: FirebaseFirestore.DocumentData,
-  hero: { id: string; pushToken?: string }
+  hero: { id: string; pushToken?: string; distance: number; rating: number; acceptanceRate: number; responseTime: number },
+  waveNumber: number
 ): Promise<void> {
   if (!hero.pushToken) {
     console.log(`Hero ${hero.id} has no push token – skipping notification`);
@@ -153,21 +205,33 @@ async function notifyHero(
     .replace(/_/g, " ")
     .toUpperCase();
 
+  const distanceMiles = (hero.distance / 1609.34).toFixed(1);
+  const estimatedPrice = String(job.pricing?.total ?? 0);
+
   try {
     await admin.messaging().send({
       token: hero.pushToken,
       notification: {
-        title: `New ${serviceLabel} Job`,
-        body: "Tap to view details and accept",
+        title: `New ${serviceLabel} Job – $${estimatedPrice}`,
+        body: `${distanceMiles} mi away · ${job.pickup?.address?.formatted ?? "Pickup location"}`,
       },
-      data: { type: "new_job", jobId, serviceType: job.service?.type ?? "" },
+      data: {
+        type: "new_job",
+        jobId,
+        serviceType: job.service?.type ?? "",
+        pickupAddress: job.pickup?.address?.formatted ?? "",
+        estimatedPrice,
+        distanceMiles,
+        estimatedMinutes: String(Math.ceil(hero.distance / 1000 / 30 * 60)),
+        waveNumber: String(waveNumber),
+      },
       android: {
         priority: "high",
         notification: { channelId: "otw_jobs", sound: "default" },
       },
       apns: { payload: { aps: { sound: "default", badge: 1 } } },
     });
-    console.log(`Notification sent to hero ${hero.id} for job ${jobId}`);
+    console.log(`Notification sent to hero ${hero.id} for job ${jobId} (wave ${waveNumber})`);
   } catch (e) {
     console.error(`Failed to notify hero ${hero.id}:`, e);
   }

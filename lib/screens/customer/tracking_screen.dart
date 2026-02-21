@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
+import '../../config/dispatch_config.dart';
 import '../../config/radar_config.dart';
 import '../../config/theme.dart';
 import '../../models/job_model.dart';
@@ -438,6 +439,9 @@ class _CustomerTrackingScreenState
         service?.name ?? job?.serviceType.replaceAll('_', ' ') ?? 'Service';
     final address =
         job?.pickup.address?.formatted ?? 'Locating...';
+    final currentWave = job?.dispatch.currentWave ?? 1;
+    final totalWaves = DispatchConfig.waves.length;
+    final notifiedCount = job?.dispatch.notifiedHeroes.length ?? 0;
 
     return _PanelShell(
       children: [
@@ -525,6 +529,39 @@ class _CustomerTrackingScreenState
             ),
           ],
         ),
+        const SizedBox(height: 14),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(totalWaves, (i) {
+            final isActive = i < currentWave;
+            final isCurrent = i == currentWave - 1;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: isCurrent ? 14 : 10,
+              height: isCurrent ? 14 : 10,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isActive
+                    ? AppTheme.brandGreen
+                    : Colors.grey[300],
+                boxShadow: isCurrent
+                    ? [BoxShadow(color: AppTheme.brandGreen.withOpacity(0.4), blurRadius: 6)]
+                    : null,
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Searching wave $currentWave of $totalWaves',
+          style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+        ),
+        if (notifiedCount > 0)
+          Text(
+            '$notifiedCount heroes notified',
+            style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+          ),
         const SizedBox(height: 12),
         TextButton(
           onPressed: _isCancelling ? null : _cancelRequest,

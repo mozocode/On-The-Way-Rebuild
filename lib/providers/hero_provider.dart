@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -189,6 +190,13 @@ class HeroNotifier extends StateNotifier<HeroState> {
           jobId: jobId,
           preset: TrackingPreset.continuous,
         );
+        try {
+          final heroRef = FirebaseFirestore.instance.collection('heroes').doc(heroId);
+          await heroRef.update({
+            'stats.totalOffered': FieldValue.increment(1),
+            'stats.totalAccepted': FieldValue.increment(1),
+          });
+        } catch (_) {}
       }
       state = state.copyWith(isLoading: false);
       return success;
@@ -198,6 +206,16 @@ class HeroNotifier extends StateNotifier<HeroState> {
         error: 'Failed to accept job: $e',
       );
       return false;
+    }
+  }
+
+  Future<void> declineJob(String jobId) async {
+    try {
+      await FirebaseFunctions.instance
+          .httpsCallable('declineJob')
+          .call({'jobId': jobId});
+    } catch (e) {
+      debugPrint('Error declining job: $e');
     }
   }
 
